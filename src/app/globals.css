@@ -1,0 +1,67 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-50: #f0fdf4;
+  --color-brand-100: #dcfce7;
+  --color-brand-200: #bbf7d0;
+  --color-brand-300: #86efac;
+  --color-brand-400: #4ade80;
+  --color-brand-500: #22c55e;
+  --color-brand-600: #16a34a;
+  --color-brand-700: #15803d;
+  --color-brand-800: #166534;
+  --color-brand-900: #14532d;
+  --color-brand-950: #052e16;
+}
+
+:root {
+  --background: #020617;
+  --foreground: #f8fafc;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-feature-settings: "rlig" 1, "calt" 1;
+}
+
+@utility glass-card {
+  background-color: color-mix(in srgb, var(--color-slate-900) 40%, transparent);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--color-slate-800);
+  border-radius: 1rem;
+}
+
+@utility btn-primary {
+  background-color: var(--color-brand-600);
+  color: white;
+  font-weight: 600;
+  padding: 0.5rem 1.5rem;
+  border-radius: 0.75rem;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  
+  &:hover {
+    background-color: var(--color-brand-500);
+  }
+  
+  &:active {
+    transform: scale(0.95);
+  }
+}
+
+@utility input-field {
+  background-color: color-mix(in srgb, var(--color-slate-900) 60%, transparent);
+  border: 1px solid var(--color-slate-700);
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem;
+  transition: all 0.2s;
+  
+  &:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--color-brand-500);
+  }
+}
