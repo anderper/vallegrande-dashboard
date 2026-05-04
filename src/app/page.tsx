@@ -634,7 +634,7 @@ export default function Dashboard() {
                           if (e.target.files && e.target.files[0]) setSelectedFiles({...selectedFiles, frontal: e.target.files[0]});
                         }} />
                         <UploadCloud className={`w-8 h-8 mx-auto mb-2 ${selectedFiles.frontal ? 'text-brand-400' : 'text-slate-500 group-hover:text-brand-400'}`} />
-                        <span className="text-xs text-slate-400">{selectedFiles.frontal ? selectedFiles.frontal.name : "Subir (JPG/PNG)"}</span>
+                        <span className="text-xs text-slate-400 truncate block w-full px-2" title={selectedFiles.frontal?.name}>{selectedFiles.frontal ? selectedFiles.frontal.name : "Subir (JPG/PNG)"}</span>
                       </div>
                     )}
                   </div>
@@ -652,7 +652,7 @@ export default function Dashboard() {
                           if (e.target.files && e.target.files[0]) setSelectedFiles({...selectedFiles, reverso: e.target.files[0]});
                         }} />
                         <UploadCloud className={`w-8 h-8 mx-auto mb-2 ${selectedFiles.reverso ? 'text-brand-400' : 'text-slate-500 group-hover:text-brand-400'}`} />
-                        <span className="text-xs text-slate-400">{selectedFiles.reverso ? selectedFiles.reverso.name : "Subir (JPG/PNG)"}</span>
+                        <span className="text-xs text-slate-400 truncate block w-full px-2" title={selectedFiles.reverso?.name}>{selectedFiles.reverso ? selectedFiles.reverso.name : "Subir (JPG/PNG)"}</span>
                       </div>
                     )}
                   </div>
@@ -670,7 +670,7 @@ export default function Dashboard() {
                           if (e.target.files && e.target.files[0]) setSelectedFiles({...selectedFiles, antecedentes: e.target.files[0]});
                         }} />
                         <UploadCloud className={`w-8 h-8 mx-auto mb-2 ${selectedFiles.antecedentes ? 'text-brand-400' : 'text-slate-500 group-hover:text-brand-400'}`} />
-                        <span className="text-xs text-slate-400">{selectedFiles.antecedentes ? selectedFiles.antecedentes.name : "Subir (PDF)"}</span>
+                        <span className="text-xs text-slate-400 truncate block w-full px-2" title={selectedFiles.antecedentes?.name}>{selectedFiles.antecedentes ? selectedFiles.antecedentes.name : "Subir (PDF)"}</span>
                       </div>
                     )}
                   </div>
