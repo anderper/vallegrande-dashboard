@@ -114,16 +114,21 @@ export default function Dashboard() {
   ];
 
   const filteredPlayers = players.filter(p => {
-    // Soportamos que la columna se llame "Nombres" o "Nombre"
     const nombre = p.Nombres || p.Nombre || "";
     const apellido = p.Apellido_Paterno || p.Apellidos || "";
     const rut = p.RUT || "";
+    
+    // Función para quitar tildes y hacer minúsculas
+    const normalize = (str: string) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    // Limpiamos RUTs de puntos y guiones para la búsqueda
+    const cleanRut = (r: string) => r.replace(/[\.\-]/g, '').toLowerCase();
+    
+    const fullName = normalize(nombre + " " + apellido);
+    const searchTerm = normalize(search);
+    const isRutMatch = cleanRut(rut).includes(cleanRut(search));
 
-    return nombre && (
-      (nombre + " " + apellido).toLowerCase().includes(search.toLowerCase()) ||
-      rut.includes(search)
-    );
-  }).slice(0, 8); // Mostrar hasta 8
+    return nombre && (fullName.includes(searchTerm) || isRutMatch);
+  });
 
   return (
     <div className="flex min-h-screen relative">
