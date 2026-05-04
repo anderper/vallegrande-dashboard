@@ -21,7 +21,11 @@ import {
   Star,
   UserRound,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  UploadCloud,
+  FileText,
+  ShieldCheck,
+  Image as ImageIcon
 } from "lucide-react";
 
 interface Player {
@@ -41,9 +45,14 @@ export default function Dashboard() {
   const [search, setSearch] = useState("");
   const [currentView, setCurrentView] = useState("dashboard");
 
-  // Estados para el Modal
+  // Estados para el Modal de Registro
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Estados para el Perfil del Jugador
+  const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState<{frontal?: File, reverso?: File, antecedentes?: File}>({});
   const [formData, setFormData] = useState({
     RUT: "",
     Nombres: "",
@@ -86,10 +95,12 @@ export default function Dashboard() {
     e.preventDefault();
     setIsSubmitting(true);
     try {
+      // Indicamos que es un registro nuevo
+      const payload = { ...formData, action: "CREATE" };
       const res = await fetch('/api/players', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(payload)
       });
 
       const result = await res.json();
@@ -111,6 +122,109 @@ export default function Dashboard() {
       alert("Error de conexión al guardar.");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // ----- FUNCIONES DE COMPRESIÓN Y SUBIDA -----
+  const compressImage = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 1024; // Reducimos tamaño
+          let scaleSize = 1;
+          if (img.width > MAX_WIDTH) {
+            scaleSize = MAX_WIDTH / img.width;
+          }
+          canvas.width = img.width * scaleSize;
+          canvas.height = img.height * scaleSize;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
+          // Comprimir a JPEG con calidad 70%
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+          const base64 = dataUrl.split(',')[1];
+          resolve(base64);
+        };
+        img.onerror = (e) => reject(e);
+      };
+      reader.onerror = (e) => reject(e);
+    });
+  };
+
+  const getBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => {
+        const base64 = (reader.result as string).split(',')[1];
+        resolve(base64);
+      };
+      reader.onerror = (e) => reject(e);
+    });
+  };
+
+  const handleUpdatePlayerDocs = async (newStatus?: string) => {
+    if (!selectedPlayer) return;
+    setIsUploading(true);
+
+    try {
+      const payload: any = { 
+        action: "UPDATE_DOCS", 
+        RUT: selectedPlayer.RUT 
+      };
+
+      if (selectedFiles.frontal) {
+        payload.fileFrontal = { base64: await compressImage(selectedFiles.frontal), mimeType: 'image/jpeg' };
+      }
+      if (selectedFiles.reverso) {
+        payload.fileReverso = { base64: await compressImage(selectedFiles.reverso), mimeType: 'image/jpeg' };
+      }
+      if (selectedFiles.antecedentes) {
+        payload.fileAntecedentes = { base64: await getBase64(selectedFiles.antecedentes), mimeType: 'application/pdf' };
+      }
+
+      // Evaluar Auto-Status
+      const hasFrontal = payload.fileFrontal || selectedPlayer.Foto_Cedula_Frontal;
+      const hasReverso = payload.fileReverso || selectedPlayer.Foto_Cedula_Reverso;
+      const hasAntecedentes = payload.fileAntecedentes || selectedPlayer.Antecedentes_PDF;
+      
+      let finalStatus = newStatus || selectedPlayer.Status_Validacion;
+      
+      // Auto-cambio si se subieron los 3 y está en Pendiente
+      if (!newStatus && (selectedPlayer.Status_Validacion === 'Pendiente' || !selectedPlayer.Status_Validacion)) {
+        if (hasFrontal && hasReverso && hasAntecedentes) {
+          finalStatus = "POR FEDERAR";
+        }
+      }
+
+      if (finalStatus !== selectedPlayer.Status_Validacion) {
+        payload.newStatus = finalStatus;
+      }
+
+      const res = await fetch('/api/players', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const result = await res.json();
+      if (result.success) {
+        alert("¡Datos actualizados con éxito!");
+        setSelectedFiles({});
+        setSelectedPlayer(null);
+        fetchData();
+      } else {
+        alert("Error de Apps Script: " + result.error);
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Error al enviar los archivos.");
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -252,7 +366,7 @@ export default function Dashboard() {
                       </thead>
                       <tbody className="divide-y divide-slate-800">
                         {filteredPlayers.map((player, i) => (
-                          <tr key={i} className="hover:bg-slate-900/50 transition-colors cursor-pointer group">
+                          <tr key={i} onClick={() => setSelectedPlayer(player)} className="hover:bg-slate-900/50 transition-colors cursor-pointer group">
                             <td className="px-6 py-4">
                               <div className="font-medium text-slate-200">{player.Nombres || player.Nombre} {player.Apellido_Paterno || player.Apellidos}</div>
                               <div className="text-xs text-slate-500 font-mono mt-0.5">{player.RUT}</div>
@@ -301,7 +415,7 @@ export default function Dashboard() {
             </div>
           </>
         ) : (
-          <JugadoresView players={players} />
+          <JugadoresView players={players} onSelectPlayer={setSelectedPlayer} />
         )}
       </main>
 
@@ -447,6 +561,150 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      {/* Modal de Perfil de Jugador / Gestión Documental */}
+      {selectedPlayer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="glass-card w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl shadow-black overflow-hidden">
+            {/* Header del Perfil */}
+            <div className="bg-slate-900/90 backdrop-blur-md p-6 border-b border-slate-800 flex items-start justify-between">
+              <div className="flex gap-4 items-center">
+                <div className="w-16 h-16 rounded-full bg-brand-500/20 text-brand-400 flex items-center justify-center text-2xl font-bold border border-brand-500/30">
+                  {selectedPlayer.Nombres?.charAt(0) || "J"}
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-white">{selectedPlayer.Nombres?.trim() || selectedPlayer.Nombre?.trim()} {selectedPlayer.Apellido_Paterno?.trim() || selectedPlayer.Apellidos?.trim()}</h2>
+                  <div className="flex gap-3 text-sm text-slate-400 mt-1">
+                    <span className="font-mono">{selectedPlayer.RUT}</span>
+                    <span>•</span>
+                    <span className="font-medium text-slate-300">{selectedPlayer.Serie}</span>
+                  </div>
+                </div>
+              </div>
+              <button onClick={() => {setSelectedPlayer(null); setSelectedFiles({});}} className="p-2 hover:bg-slate-800 rounded-full transition-colors text-slate-400">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 space-y-8">
+              {/* Estado de Validación */}
+              <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between p-5 bg-slate-900/50 rounded-2xl border border-slate-800">
+                <div>
+                  <h3 className="text-sm text-slate-400 mb-1">Estado de Federación</h3>
+                  <span className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-bold border ${
+                    selectedPlayer.Status_Validacion?.toUpperCase() === 'FEDERADO' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' :
+                    selectedPlayer.Status_Validacion?.toUpperCase() === 'POR FEDERAR' ? 'bg-blue-500/10 text-blue-400 border-blue-500/30' :
+                    'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                  }`}>
+                    <ShieldCheck className="w-4 h-4" />
+                    {(selectedPlayer.Status_Validacion || 'PENDIENTE').toUpperCase()}
+                  </span>
+                </div>
+                
+                {/* Controles Manuales de Estado */}
+                <div className="flex gap-2">
+                  {selectedPlayer.Status_Validacion?.toUpperCase() === 'POR FEDERAR' && (
+                     <button onClick={() => handleUpdatePlayerDocs("FEDERADO")} disabled={isUploading} className="btn-primary py-2 px-4 text-xs font-bold">
+                       Aprobar: Federado
+                     </button>
+                  )}
+                  {selectedPlayer.Status_Validacion?.toUpperCase() === 'FEDERADO' && (
+                     <button onClick={() => handleUpdatePlayerDocs("POR FEDERAR")} disabled={isUploading} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs font-bold transition-colors">
+                       Revertir Estado
+                     </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Gestión de Documentos */}
+              <div>
+                <h3 className="text-sm font-bold text-brand-400 uppercase tracking-wider mb-4 border-b border-slate-800 pb-2">Gestión Documental</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  
+                  {/* Carnet Frontal */}
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-slate-300">Cédula (Frontal)</label>
+                    {selectedPlayer.Foto_Cedula_Frontal?.trim() ? (
+                      <a href={selectedPlayer.Foto_Cedula_Frontal} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 p-4 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl hover:bg-emerald-500/20 transition-colors">
+                        <ImageIcon className="w-5 h-5" /> Ver Documento
+                      </a>
+                    ) : (
+                      <div className="relative border-2 border-dashed border-slate-700 hover:border-brand-500 rounded-xl p-4 text-center cursor-pointer transition-colors group">
+                        <input type="file" accept="image/jpeg, image/png, image/webp" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={(e) => {
+                          if (e.target.files && e.target.files[0]) setSelectedFiles({...selectedFiles, frontal: e.target.files[0]});
+                        }} />
+                        <UploadCloud className={`w-8 h-8 mx-auto mb-2 ${selectedFiles.frontal ? 'text-brand-400' : 'text-slate-500 group-hover:text-brand-400'}`} />
+                        <span className="text-xs text-slate-400">{selectedFiles.frontal ? selectedFiles.frontal.name : "Subir (JPG/PNG)"}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Carnet Reverso */}
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-slate-300">Cédula (Reverso)</label>
+                    {selectedPlayer.Foto_Cedula_Reverso?.trim() ? (
+                      <a href={selectedPlayer.Foto_Cedula_Reverso} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 p-4 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl hover:bg-emerald-500/20 transition-colors">
+                        <ImageIcon className="w-5 h-5" /> Ver Documento
+                      </a>
+                    ) : (
+                      <div className="relative border-2 border-dashed border-slate-700 hover:border-brand-500 rounded-xl p-4 text-center cursor-pointer transition-colors group">
+                        <input type="file" accept="image/jpeg, image/png, image/webp" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={(e) => {
+                          if (e.target.files && e.target.files[0]) setSelectedFiles({...selectedFiles, reverso: e.target.files[0]});
+                        }} />
+                        <UploadCloud className={`w-8 h-8 mx-auto mb-2 ${selectedFiles.reverso ? 'text-brand-400' : 'text-slate-500 group-hover:text-brand-400'}`} />
+                        <span className="text-xs text-slate-400">{selectedFiles.reverso ? selectedFiles.reverso.name : "Subir (JPG/PNG)"}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Antecedentes */}
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-slate-300">Antecedentes Penales</label>
+                    {selectedPlayer.Antecedentes_PDF?.trim() ? (
+                      <a href={selectedPlayer.Antecedentes_PDF} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 p-4 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl hover:bg-emerald-500/20 transition-colors">
+                        <FileText className="w-5 h-5" /> Ver Documento (PDF)
+                      </a>
+                    ) : (
+                      <div className="relative border-2 border-dashed border-slate-700 hover:border-brand-500 rounded-xl p-4 text-center cursor-pointer transition-colors group">
+                        <input type="file" accept="application/pdf" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={(e) => {
+                          if (e.target.files && e.target.files[0]) setSelectedFiles({...selectedFiles, antecedentes: e.target.files[0]});
+                        }} />
+                        <UploadCloud className={`w-8 h-8 mx-auto mb-2 ${selectedFiles.antecedentes ? 'text-brand-400' : 'text-slate-500 group-hover:text-brand-400'}`} />
+                        <span className="text-xs text-slate-400">{selectedFiles.antecedentes ? selectedFiles.antecedentes.name : "Subir (PDF)"}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Info Text */}
+                <div className="mt-4 p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl">
+                  <p className="text-xs text-blue-300 leading-relaxed">
+                    <strong>Sistema Automático:</strong> Al guardar los 3 documentos faltantes, el estado cambiará automáticamente de "PENDIENTE" a "POR FEDERAR".
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Acciones */}
+            <div className="p-6 border-t border-slate-800 bg-slate-900/50 flex justify-end gap-3">
+              <button onClick={() => {setSelectedPlayer(null); setSelectedFiles({});}} className="px-6 py-2 text-sm font-medium text-slate-300 hover:text-white transition-colors">
+                Cerrar
+              </button>
+              <button 
+                onClick={() => handleUpdatePlayerDocs()}
+                disabled={isUploading || Object.keys(selectedFiles).length === 0} 
+                className="btn-primary py-2 px-6 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isUploading ? (
+                  <><Loader2 className="w-4 h-4 animate-spin" /> Guardando en Drive...</>
+                ) : (
+                  <><Save className="w-4 h-4" /> Guardar Archivos ({Object.keys(selectedFiles).length})</>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -466,7 +724,7 @@ function NavItem({ icon: Icon, label, active = false, onClick }: { icon: any, la
   );
 }
 
-function JugadoresView({ players }: { players: Player[] }) {
+function JugadoresView({ players, onSelectPlayer }: { players: Player[], onSelectPlayer: (p: Player) => void }) {
   const [openSeries, setOpenSeries] = useState<string[]>([]);
   
   const toggleSerie = (serie: string) => {
@@ -529,7 +787,7 @@ function JugadoresView({ players }: { players: Player[] }) {
               <div className="p-4 border-t border-slate-800 bg-slate-950/50">
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                   {list.map((p, i) => (
-                    <div key={i} className="p-4 rounded-xl border border-slate-800 bg-slate-900/80 flex flex-col gap-3 hover:border-slate-700 transition-colors">
+                    <div onClick={() => onSelectPlayer(p)} key={i} className="p-4 rounded-xl border border-slate-800 bg-slate-900/80 flex flex-col gap-3 hover:border-slate-700 cursor-pointer transition-colors group">
                       <div className="flex justify-between items-start">
                         <div>
                           <p className="font-bold text-slate-200 leading-tight">{p.Nombres || p.Nombre} {p.Apellido_Paterno || p.Apellidos}</p>
