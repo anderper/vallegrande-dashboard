@@ -37,8 +37,15 @@ export async function POST(request: Request) {
     });
 
     const textResponse = await response.text();
-    return NextResponse.json({ success: true, message: textResponse });
+    
+    // Verificamos si Google Apps Script nos devolvió "SUCCESS" o un Error
+    if (textResponse.includes("SUCCESS")) {
+      return NextResponse.json({ success: true, message: textResponse });
+    } else {
+      console.error("Error desde Apps Script:", textResponse);
+      return NextResponse.json({ success: false, error: textResponse }, { status: 400 });
+    }
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
