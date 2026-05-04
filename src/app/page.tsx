@@ -1,11 +1,11 @@
 'use client';
 
 import { useState, useEffect } from "react";
-import { 
-  LayoutDashboard, 
-  Users, 
-  CheckCircle2, 
-  Clock, 
+import {
+  LayoutDashboard,
+  Users,
+  CheckCircle2,
+  Clock,
   AlertCircle,
   Plus,
   Search,
@@ -32,7 +32,7 @@ export default function Dashboard() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  
+
   // Estados para el Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -56,7 +56,7 @@ export default function Dashboard() {
       // Agregamos un timestamp para que el navegador nunca use datos cacheados
       const res = await fetch(`/api/players?t=${new Date().getTime()}`, { cache: 'no-store' });
       const data = await res.json();
-      if(Array.isArray(data)) {
+      if (Array.isArray(data)) {
         setPlayers(data);
       }
     } catch (error) {
@@ -83,9 +83,9 @@ export default function Dashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
       });
-      
+
       const result = await res.json();
-      if(result.success) {
+      if (result.success) {
         setIsModalOpen(false);
         // Limpiar formulario
         setFormData({
@@ -118,7 +118,7 @@ export default function Dashboard() {
     const nombre = p.Nombres || p.Nombre || "";
     const apellido = p.Apellido_Paterno || p.Apellidos || "";
     const rut = p.RUT || "";
-    
+
     return nombre && (
       (nombre + " " + apellido).toLowerCase().includes(search.toLowerCase()) ||
       rut.includes(search)
@@ -130,9 +130,9 @@ export default function Dashboard() {
       {/* Sidebar */}
       <aside className="w-64 border-r border-slate-800 p-6 hidden md:block z-10 bg-slate-950">
         <div className="flex items-center gap-3 mb-10">
-          <img 
-            src="/logo.png" 
-            alt="Logo Valle Grande FC" 
+          <img
+            src="/logo.png"
+            alt="Logo Valle Grande FC"
             className="w-12 h-12 object-contain drop-shadow-md"
             onError={(e) => {
               // Fallback visual si la imagen aún no se sube
@@ -145,7 +145,7 @@ export default function Dashboard() {
           </div>
           <span className="font-bold text-lg tracking-tight">Valle Grande FC</span>
         </div>
-        
+
         <nav className="space-y-1">
           <NavItem icon={LayoutDashboard} label="Dashboard" active />
           <NavItem icon={Users} label="Jugadores" />
@@ -160,8 +160,8 @@ export default function Dashboard() {
           <div>
             <div className="flex items-center gap-4">
               <h1 className="text-3xl font-bold tracking-tight">Panel de Control</h1>
-              <button 
-                onClick={fetchData} 
+              <button
+                onClick={fetchData}
                 className="p-2 hover:bg-slate-900 rounded-lg transition-colors text-slate-400"
                 title="Actualizar datos"
               >
@@ -170,13 +170,13 @@ export default function Dashboard() {
             </div>
             <p className="text-slate-400 mt-1">Gestión documental en tiempo real.</p>
           </div>
-          
+
           <div className="flex items-center gap-3">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-              <input 
-                type="text" 
-                placeholder="Buscar por RUT o Nombre..." 
+              <input
+                type="text"
+                placeholder="Buscar por RUT o Nombre..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="input-field pl-10 pr-4 py-2 w-64 text-sm"
@@ -244,11 +244,10 @@ export default function Dashboard() {
                           </span>
                         </td>
                         <td className="px-6 py-4">
-                          <span className={`px-3 py-1 rounded-full text-xs font-medium border ${
-                            player.Status_Validacion === 'Aprobado' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-                            player.Status_Validacion === 'Pendiente' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
-                            'bg-rose-500/10 text-rose-400 border-rose-500/20'
-                          }`}>
+                          <span className={`px-3 py-1 rounded-full text-xs font-medium border ${player.Status_Validacion === 'Aprobado' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                              player.Status_Validacion === 'Pendiente' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
+                                'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                            }`}>
                             {player.Status_Validacion || 'Pendiente'}
                           </span>
                         </td>
@@ -289,20 +288,20 @@ export default function Dashboard() {
           <div className="glass-card w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl shadow-black">
             <div className="sticky top-0 bg-slate-900/90 backdrop-blur-md p-6 border-b border-slate-800 flex items-center justify-between z-10">
               <h2 className="text-xl font-bold text-white">Registrar Nuevo Jugador</h2>
-              <button 
+              <button
                 onClick={() => setIsModalOpen(false)}
                 className="p-2 hover:bg-slate-800 rounded-full transition-colors text-slate-400 hover:text-white"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
-            
+
             <form onSubmit={handleSubmit} className="p-6 space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Datos Personales */}
                 <div className="space-y-4">
                   <h3 className="text-sm font-bold text-brand-400 uppercase tracking-wider mb-4 border-b border-slate-800 pb-2">Datos Personales</h3>
-                  
+
                   <div>
                     <label className="block text-xs font-medium text-slate-400 mb-1">RUT *</label>
                     <input required name="RUT" value={formData.RUT} onChange={handleInputChange} type="text" placeholder="12.345.678-9" className="input-field w-full text-sm" />
@@ -360,7 +359,7 @@ export default function Dashboard() {
                 {/* Club & Contacto */}
                 <div className="space-y-4">
                   <h3 className="text-sm font-bold text-brand-400 uppercase tracking-wider mb-4 border-b border-slate-800 pb-2">Club & Contacto</h3>
-                  
+
                   <div>
                     <label className="block text-xs font-medium text-slate-400 mb-1">Serie *</label>
                     <select required name="Serie" value={formData.Serie} onChange={handleInputChange} className="input-field w-full text-sm appearance-none">
@@ -402,15 +401,15 @@ export default function Dashboard() {
               </div>
 
               <div className="pt-6 border-t border-slate-800 flex justify-end gap-3">
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   onClick={() => setIsModalOpen(false)}
                   className="px-6 py-2 text-sm font-medium text-slate-300 hover:text-white transition-colors"
                 >
                   Cancelar
                 </button>
-                <button 
-                  type="submit" 
+                <button
+                  type="submit"
                   disabled={isSubmitting}
                   className="btn-primary text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
@@ -431,13 +430,12 @@ export default function Dashboard() {
 
 function NavItem({ icon: Icon, label, active = false }: { icon: any, label: string, active?: boolean }) {
   return (
-    <a 
-      href="#" 
-      className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
-        active 
-        ? "bg-brand-600 text-white shadow-lg shadow-brand-600/20" 
-        : "text-slate-400 hover:text-white hover:bg-slate-900"
-      }`}
+    <a
+      href="#"
+      className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${active
+          ? "bg-brand-600 text-white shadow-lg shadow-brand-600/20"
+          : "text-slate-400 hover:text-white hover:bg-slate-900"
+        }`}
     >
       <Icon className="w-5 h-5" />
       <span className="font-medium">{label}</span>
