@@ -337,10 +337,18 @@ export default function Dashboard() {
                     <select required name="Serie" value={formData.Serie} onChange={handleInputChange} className="input-field w-full text-sm appearance-none">
                       <option value="">Selecciona una serie...</option>
                       <option value="1ERA INFANTIL">1ERA INFANTIL</option>
+                      <option value="2DA INFANTIL">2DA INFANTIL</option>
+                      <option value="3RA INFANTIL">3RA INFANTIL</option>
+                      <option value="4TA INFANTIL">4TA INFANTIL</option>
                       <option value="JUVENIL">JUVENIL</option>
+                      <option value="3RA ADULTA">3RA ADULTA</option>
+                      <option value="2DA ADULTA">2DA ADULTA</option>
                       <option value="1ERA ADULTA">1ERA ADULTA</option>
                       <option value="SENIOR">SENIOR</option>
-                      {/* Puedes agregar todas las demás aquí */}
+                      <option value="SUPER SENIOR">SUPER SENIOR</option>
+                      <option value="DORADOS">DORADOS</option>
+                      <option value="FEMENINA INFANTIL">FEMENINA INFANTIL</option>
+                      <option value="FEMENINA ADULTA">FEMENINA ADULTA</option>
                     </select>
                   </div>
                   <div>
