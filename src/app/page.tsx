@@ -53,8 +53,8 @@ export default function Dashboard() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Ahora llamamos a nuestra API local
-      const res = await fetch('/api/players');
+      // Agregamos un timestamp para que el navegador nunca use datos cacheados
+      const res = await fetch(`/api/players?t=${new Date().getTime()}`, { cache: 'no-store' });
       const data = await res.json();
       if(Array.isArray(data)) {
         setPlayers(data);
@@ -113,12 +113,17 @@ export default function Dashboard() {
     { label: "Rechazados", value: players.filter(p => p.Status_Validacion === 'Rechazado').length, icon: AlertCircle, iconColor: "text-rose-500", bg: "bg-rose-500/10" },
   ];
 
-  const filteredPlayers = players.filter(p => 
-    p.Nombres && (
-      (p.Nombres + " " + p.Apellido_Paterno).toLowerCase().includes(search.toLowerCase()) ||
-      p.RUT.includes(search)
-    )
-  ).slice(0, 8); // Mostrar hasta 8
+  const filteredPlayers = players.filter(p => {
+    // Soportamos que la columna se llame "Nombres" o "Nombre"
+    const nombre = p.Nombres || p.Nombre || "";
+    const apellido = p.Apellido_Paterno || p.Apellidos || "";
+    const rut = p.RUT || "";
+    
+    return nombre && (
+      (nombre + " " + apellido).toLowerCase().includes(search.toLowerCase()) ||
+      rut.includes(search)
+    );
+  }).slice(0, 8); // Mostrar hasta 8
 
   return (
     <div className="flex min-h-screen relative">
@@ -230,7 +235,7 @@ export default function Dashboard() {
                     {filteredPlayers.map((player, i) => (
                       <tr key={i} className="hover:bg-slate-900/50 transition-colors cursor-pointer group">
                         <td className="px-6 py-4">
-                          <div className="font-medium text-slate-200">{player.Nombres} {player.Apellido_Paterno}</div>
+                          <div className="font-medium text-slate-200">{player.Nombres || player.Nombre} {player.Apellido_Paterno || player.Apellidos}</div>
                           <div className="text-xs text-slate-500 font-mono mt-0.5">{player.RUT}</div>
                         </td>
                         <td className="px-6 py-4">
