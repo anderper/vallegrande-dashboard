@@ -42,7 +42,7 @@ export default function Dashboard() {
     Apellido_Paterno: "",
     Apellido_Materno: "",
     Fecha_Nacimiento: "",
-    Nacionalidad: "Chilena",
+    Nacionalidad: "Chile",
     Serie: "",
     WhatsApp: "",
     Direccion: "",
@@ -323,7 +323,31 @@ export default function Dashboard() {
                     </div>
                     <div className="flex-1">
                       <label className="block text-xs font-medium text-slate-400 mb-1">Nacionalidad</label>
-                      <input name="Nacionalidad" value={formData.Nacionalidad} onChange={handleInputChange} type="text" className="input-field w-full text-sm" />
+                      <select name="Nacionalidad" value={formData.Nacionalidad} onChange={handleInputChange} className="input-field w-full text-sm appearance-none">
+                        <option value="Chile">Chile</option>
+                        <option value="Argentina">Argentina</option>
+                        <option value="Bolivia">Bolivia</option>
+                        <option value="Brasil">Brasil</option>
+                        <option value="Colombia">Colombia</option>
+                        <option value="Ecuador">Ecuador</option>
+                        <option value="Paraguay">Paraguay</option>
+                        <option value="Perú">Perú</option>
+                        <option value="Uruguay">Uruguay</option>
+                        <option value="Venezuela">Venezuela</option>
+                        <option disabled>──────────</option>
+                        <option value="México">México</option>
+                        <option value="Estados Unidos">Estados Unidos</option>
+                        <option value="Canadá">Canadá</option>
+                        <option value="Costa Rica">Costa Rica</option>
+                        <option value="Cuba">Cuba</option>
+                        <option value="El Salvador">El Salvador</option>
+                        <option value="Guatemala">Guatemala</option>
+                        <option value="Honduras">Honduras</option>
+                        <option value="Nicaragua">Nicaragua</option>
+                        <option value="Panamá">Panamá</option>
+                        <option value="Puerto Rico">Puerto Rico</option>
+                        <option value="República Dominicana">República Dominicana</option>
+                      </select>
                     </div>
                   </div>
                 </div>
