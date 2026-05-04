@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 
+export const dynamic = 'force-dynamic';
+
 const SCRIPT_URL = process.env.NEXT_PUBLIC_GOOGLE_SCRIPT_URL;
 
 export async function GET() {
@@ -19,32 +21,22 @@ export async function POST(request: Request) {
     if (!SCRIPT_URL) throw new Error("URL de Google Script no configurada");
 
     const body = await request.json();
-    
-    // Le agregamos la acción que espera nuestro script
-    const payload = {
-      action: "ADD",
-      ...body
-    };
 
     const response = await fetch(SCRIPT_URL, {
       method: 'POST',
-      body: JSON.stringify(payload),
-      // Es importante seguir la redirección porque Google Script siempre responde con un 302
+      body: JSON.stringify(body),
       redirect: 'follow',
       headers: {
         'Content-Type': 'text/plain;charset=utf-8',
       }
     });
 
-    const textResponse = await response.text();
+    // Leer la respuesta como JSON
+    const data = await response.json();
     
-    // Verificamos si Google Apps Script nos devolvió "SUCCESS" o un Error
-    if (textResponse.includes("SUCCESS")) {
-      return NextResponse.json({ success: true, message: textResponse });
-    } else {
-      console.error("Error desde Apps Script:", textResponse);
-      return NextResponse.json({ success: false, error: textResponse }, { status: 400 });
-    }
+    // Devolvemos el JSON tal cual
+    return NextResponse.json(data);
+
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
