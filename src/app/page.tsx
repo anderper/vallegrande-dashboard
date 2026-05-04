@@ -125,7 +125,19 @@ export default function Dashboard() {
       {/* Sidebar */}
       <aside className="w-64 border-r border-slate-800 p-6 hidden md:block z-10 bg-slate-950">
         <div className="flex items-center gap-3 mb-10">
-          <div className="w-10 h-10 bg-brand-600 rounded-lg flex items-center justify-center font-bold text-xl">VG</div>
+          <img 
+            src="/logo.png" 
+            alt="Logo Valle Grande FC" 
+            className="w-12 h-12 object-contain drop-shadow-md"
+            onError={(e) => {
+              // Fallback visual si la imagen aún no se sube
+              e.currentTarget.style.display = 'none';
+              e.currentTarget.parentElement?.querySelector('.fallback-logo')?.classList.remove('hidden');
+            }}
+          />
+          <div className="fallback-logo hidden w-10 h-10 bg-brand-600 rounded-lg flex items-center justify-center font-bold text-xl shadow-lg shadow-brand-500/20">
+            VG
+          </div>
           <span className="font-bold text-lg tracking-tight">Valle Grande FC</span>
         </div>
         
