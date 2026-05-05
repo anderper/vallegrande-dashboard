@@ -227,7 +227,20 @@ export default function RegistroPublico() {
                    <label className="text-[10px] text-slate-500 uppercase ml-1">Serie</label>
                   <select required name="Serie" value={formData.Serie} onChange={handleInputChange} className="input-field w-full text-base">
                     <option value="">Selecciona serie...</option>
-                    {["1ERA INFANTIL", "2DA INFANTIL", "3RA INFANTIL", "4TA INFANTIL", "JUVENIL", "3RA ADULTA", "2DA ADULTA", "1ERA ADULTA", "SENIOR", "SUPER SENIOR", "DORADOS", "FEMENINA INFANTIL", "FEMENINA ADULTA"].map(s => <option key={s} value={s}>{s}</option>)}
+                    {[
+                      "1ERA INFANTIL", "2DA INFANTIL", "3RA INFANTIL", "4TA INFANTIL", "JUVENIL", 
+                      "3RA ADULTA", "2DA ADULTA", "1ERA ADULTA", "SENIOR", "SUPER SENIOR", 
+                      "DORADOS", "FEMENINA INFANTIL", "FEMENINA ADULTA"
+                    ]
+                    .filter(s => {
+                      if (!formData.Fecha_Nacimiento) return true; // Mostrar todas si no hay fecha aún
+                      if (isMinor) {
+                        return s.includes("INFANTIL") || s.includes("JUVENIL");
+                      } else {
+                        return s.includes("ADULTA") || s.includes("SENIOR") || s.includes("DORADOS");
+                      }
+                    })
+                    .map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
               </div>
