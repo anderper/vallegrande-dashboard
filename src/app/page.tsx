@@ -278,7 +278,7 @@ export default function Dashboard() {
   });
 
   return (
-    <div className="flex min-h-screen relative">
+    <div className="flex min-h-screen relative pb-20 md:pb-0">
       {/* Sidebar */}
       <aside className="w-64 border-r border-slate-800 p-6 hidden md:block z-10 bg-slate-950">
         <div className="flex items-center gap-3 mb-10">
@@ -307,43 +307,46 @@ export default function Dashboard() {
 
       {/* Main Content */}
       <main className="flex-1 p-4 md:p-10 overflow-y-auto">
-        <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-10">
-          <div>
+        <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 md:mb-10">
+          <div className="flex justify-between items-start w-full md:w-auto">
             <div className="flex items-center gap-4">
-              <h1 className="text-3xl font-bold tracking-tight">
+              <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
                 {currentView === 'dashboard' ? 'Panel de Control' : currentView === 'jugadores' ? 'Directorio de Jugadores' : 'Gestión de Validaciones'}
               </h1>
               <button
                 onClick={fetchData}
-                className="p-2 hover:bg-slate-900 rounded-lg transition-colors text-slate-400"
+                className="p-2 hover:bg-slate-900 rounded-lg transition-colors text-slate-400 shrink-0"
                 title="Actualizar datos"
               >
                 <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-brand-500' : ''}`} />
               </button>
             </div>
-            <p className="text-slate-400 mt-1">Gestión documental en tiempo real.</p>
           </div>
+          
+          <p className="text-slate-400 mt-1 hidden md:block">Gestión documental en tiempo real.</p>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
             {currentView === 'dashboard' && (
-              <div className="relative">
+              <div className="relative w-full sm:w-auto">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                 <input
                   type="text"
                   placeholder="Buscar por RUT o Nombre..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="input-field pl-10 pr-4 py-2 w-64 text-sm"
+                  className="input-field pl-10 pr-4 py-2 w-full md:w-64 text-sm md:text-base"
                 />
               </div>
             )}
-            <button onClick={() => setIsImportModalOpen(true)} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm font-bold transition-colors flex items-center gap-2">
-              <Upload className="w-4 h-4" /> Importar
-            </button>
-            <button onClick={() => setIsModalOpen(true)} className="btn-primary py-2 text-sm">
-              <Plus className="w-4 h-4" />
-              Nuevo Jugador
-            </button>
+            <div className="flex gap-2 w-full sm:w-auto">
+              <button onClick={() => setIsImportModalOpen(true)} className="flex-1 sm:flex-none px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm font-bold transition-colors flex items-center justify-center gap-2">
+                <Upload className="w-4 h-4" /> Importar
+              </button>
+              <button onClick={() => setIsModalOpen(true)} className="flex-1 sm:flex-none btn-primary py-2 text-sm flex items-center justify-center gap-2">
+                <Plus className="w-4 h-4" />
+                Nuevo
+              </button>
+            </div>
           </div>
         </header>
 
@@ -461,6 +464,22 @@ export default function Dashboard() {
           <ValidacionesView players={players} onSelectPlayer={setSelectedPlayer} />
         )}
       </main>
+
+      {/* Mobile Bottom Navigation */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-950/90 backdrop-blur-md border-t border-slate-800 flex justify-around items-center p-3 z-40 px-6">
+        <button onClick={() => setCurrentView('dashboard')} className={`flex flex-col items-center gap-1 transition-colors ${currentView === 'dashboard' ? 'text-brand-500' : 'text-slate-500'}`}>
+          <LayoutDashboard className="w-5 h-5" />
+          <span className="text-[10px] font-medium">Panel</span>
+        </button>
+        <button onClick={() => setCurrentView('jugadores')} className={`flex flex-col items-center gap-1 transition-colors ${currentView === 'jugadores' ? 'text-brand-500' : 'text-slate-500'}`}>
+          <Users className="w-5 h-5" />
+          <span className="text-[10px] font-medium">Jugadores</span>
+        </button>
+        <button onClick={() => setCurrentView('validaciones')} className={`flex flex-col items-center gap-1 transition-colors ${currentView === 'validaciones' ? 'text-brand-500' : 'text-slate-500'}`}>
+          <Clock className="w-5 h-5" />
+          <span className="text-[10px] font-medium">Validar</span>
+        </button>
+      </nav>
 
       {/* Modal Importar */}
       {isImportModalOpen && <ImportModal onClose={() => setIsImportModalOpen(false)} onRefresh={fetchData} />}
@@ -883,29 +902,30 @@ function ValidacionesView({ players, onSelectPlayer }: { players: Player[], onSe
 
   return (
      <div className="space-y-6">
-       <div className="flex flex-col md:flex-row gap-4 justify-between items-center glass-card p-4">
-         <div className="flex gap-4 items-center">
-           <Filter className="w-5 h-5 text-brand-500" />
-           <select className="input-field py-2 text-sm" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+       <div className="flex flex-col md:flex-row gap-4 justify-between items-stretch md:items-center glass-card p-4">
+         <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center">
+           <Filter className="w-5 h-5 text-brand-500 hidden md:block" />
+           <select className="input-field py-2 text-sm w-full md:w-auto" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
              <option value="Todos">Todos los Estados</option>
              <option value="PENDIENTE">Solo Pendientes</option>
              <option value="POR FEDERAR">Solo Por Federar</option>
              <option value="FEDERADO">Solo Federados</option>
            </select>
            
-           <select className="input-field py-2 text-sm" value={filterSerie} onChange={e => setFilterSerie(e.target.value)}>
+           <select className="input-field py-2 text-sm w-full md:w-auto" value={filterSerie} onChange={e => setFilterSerie(e.target.value)}>
              <option value="Todos">Todas las Series</option>
              {series.map(s => <option key={s} value={s}>{s}</option>)}
            </select>
          </div>
-         <button onClick={() => setIsExportModalOpen(true)} className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors">
+         <button onClick={() => setIsExportModalOpen(true)} className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-colors w-full md:w-auto">
            <Download className="w-4 h-4" /> Exportar a Excel ({filtered.length})
          </button>
        </div>
 
        {/* Table */}
        <div className="glass-card overflow-hidden">
-          <table className="w-full text-left">
+         <div className="overflow-x-auto custom-scrollbar">
+          <table className="w-full text-left min-w-[800px]">
             <thead>
               <tr className="text-slate-500 text-sm border-b border-slate-800 bg-slate-900/20">
                 <th className="px-6 py-4 font-medium">Jugador</th>
@@ -949,6 +969,7 @@ function ValidacionesView({ players, onSelectPlayer }: { players: Player[], onSe
               ))}
             </tbody>
           </table>
+         </div>
        </div>
 
        {isExportModalOpen && <ExportModal players={filtered} onClose={() => setIsExportModalOpen(false)} />}
@@ -1127,3 +1148,6 @@ function ImportModal({ onClose, onRefresh }: { onClose: () => void, onRefresh: (
     </div>
   );
 }
+
+// Boton de Navegación Inferior agregado directamente en Dashboard
+// y cerrado de div principal.
