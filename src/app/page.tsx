@@ -407,7 +407,7 @@ export default function Dashboard() {
                               </span>
                             </td>
                             <td className="px-6 py-4">
-                              <span className={`px-3 py-1 rounded-full text-xs font-medium border ${
+                              <span className={`px-3 py-1 rounded-full text-xs font-medium border whitespace-nowrap inline-flex items-center gap-1 ${
                                   player.Status_Validacion?.toUpperCase() === 'FEDERADO' || player.Status_Validacion?.toUpperCase() === 'APROBADO' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
                                   player.Status_Validacion?.toUpperCase() === 'POR FEDERAR' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
                                   'bg-amber-500/10 text-amber-400 border-amber-500/20'
@@ -858,7 +858,7 @@ function JugadoresView({ players, onSelectPlayer }: { players: Player[], onSelec
                           <p className="font-bold text-slate-200 leading-tight">{p.Nombres || p.Nombre} {p.Apellido_Paterno || p.Apellidos}</p>
                           <p className="text-xs font-mono text-slate-500 mt-1">{p.RUT}</p>
                         </div>
-                        <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider border ${
+                        <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider border whitespace-nowrap inline-flex items-center gap-1 ${
                             p.Status_Validacion === 'Aprobado' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
                             p.Status_Validacion === 'Pendiente' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
                             'bg-rose-500/10 text-rose-400 border-rose-500/20'
@@ -951,7 +951,7 @@ function ValidacionesView({ players, onSelectPlayer }: { players: Player[], onSe
                     <span className="text-sm text-slate-300 bg-slate-800/50 px-2 py-1 rounded-md border border-slate-700/50">{player.Serie}</span>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium border inline-flex items-center gap-1 ${
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium border whitespace-nowrap inline-flex items-center gap-1 ${
                         player.Status_Validacion?.toUpperCase() === 'FEDERADO' || player.Status_Validacion?.toUpperCase() === 'APROBADO' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
                         player.Status_Validacion?.toUpperCase() === 'POR FEDERAR' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
                         'bg-amber-500/10 text-amber-400 border-amber-500/20'
