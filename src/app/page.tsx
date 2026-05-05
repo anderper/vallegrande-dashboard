@@ -402,7 +402,7 @@ export default function Dashboard() {
                               <div className="text-xs text-slate-500 font-mono mt-0.5">{player.RUT}</div>
                             </td>
                             <td className="px-6 py-4">
-                              <span className="text-sm text-slate-300 bg-slate-800/50 px-2 py-1 rounded-md border border-slate-700/50">
+                              <span className="text-sm text-slate-300 bg-slate-800/50 px-2 py-1 rounded-md border border-slate-700/50 whitespace-nowrap">
                                 {player.Serie}
                               </span>
                             </td>
@@ -656,7 +656,7 @@ export default function Dashboard() {
               <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between p-5 bg-slate-900/50 rounded-2xl border border-slate-800">
                 <div>
                   <h3 className="text-sm text-slate-400 mb-1">Estado de Federación</h3>
-                  <span className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-bold border ${
+                  <span className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-bold border whitespace-nowrap ${
                     selectedPlayer.Status_Validacion?.toUpperCase() === 'FEDERADO' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' :
                     selectedPlayer.Status_Validacion?.toUpperCase() === 'POR FEDERAR' ? 'bg-blue-500/10 text-blue-400 border-blue-500/30' :
                     'bg-amber-500/10 text-amber-400 border-amber-500/30'
@@ -948,7 +948,7 @@ function ValidacionesView({ players, onSelectPlayer }: { players: Player[], onSe
                     <div className="text-xs text-slate-500 font-mono mt-0.5">{player.RUT}</div>
                   </td>
                   <td className="px-6 py-4">
-                    <span className="text-sm text-slate-300 bg-slate-800/50 px-2 py-1 rounded-md border border-slate-700/50">{player.Serie}</span>
+                    <span className="text-sm text-slate-300 bg-slate-800/50 px-2 py-1 rounded-md border border-slate-700/50 whitespace-nowrap">{player.Serie}</span>
                   </td>
                   <td className="px-6 py-4">
                     <span className={`px-3 py-1 rounded-full text-xs font-medium border whitespace-nowrap inline-flex items-center gap-1 ${
@@ -1021,7 +1021,7 @@ function ExportModal({ players, onClose }: { players: Player[], onClose: () => v
           
           <div className="p-6 grid grid-cols-2 gap-3 max-h-[60vh] overflow-y-auto">
             {allFields.map(field => (
-               <label key={field} className="flex items-center gap-2 cursor-pointer p-2 rounded hover:bg-slate-800/50 transition-colors">
+               <label key={field} className="flex items-center gap-2 cursor-pointer p-2 rounded hover:bg-slate-800/50 transition-colors whitespace-nowrap">
                  <input type="checkbox" className="accent-brand-500" checked={selectedFields.includes(field)} onChange={() => toggleField(field)} />
                  <span className="text-sm text-slate-300">{field.replace(/_/g, ' ')}</span>
                </label>
