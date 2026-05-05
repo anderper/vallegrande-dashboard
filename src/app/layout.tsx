@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import { AuthProvider } from "@/context/AuthContext";
+import LoginModalWrapper from "@/components/LoginModalWrapper";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -17,7 +19,10 @@ export default function RootLayout({
   return (
     <html lang="es" className="dark">
       <body className={`${inter.className} bg-slate-950 text-slate-50 min-h-screen`}>
-        {children}
+        <AuthProvider>
+          {children}
+          <LoginModalWrapper />
+        </AuthProvider>
       </body>
     </html>
   );
