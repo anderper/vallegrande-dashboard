@@ -23,9 +23,10 @@ import {
   ChevronDown,
   ChevronUp,
   UploadCloud,
-  FileText,
   ShieldCheck,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Download,
+  Filter
 } from "lucide-react";
 
 interface Player {
@@ -292,7 +293,7 @@ export default function Dashboard() {
         <nav className="space-y-1">
           <NavItem icon={LayoutDashboard} label="Dashboard" active={currentView === 'dashboard'} onClick={() => setCurrentView('dashboard')} />
           <NavItem icon={Users} label="Jugadores" active={currentView === 'jugadores'} onClick={() => setCurrentView('jugadores')} />
-          <NavItem icon={Clock} label="Validaciones" />
+          <NavItem icon={Clock} label="Validaciones" active={currentView === 'validaciones'} onClick={() => setCurrentView('validaciones')} />
         </nav>
       </aside>
 
@@ -302,7 +303,7 @@ export default function Dashboard() {
           <div>
             <div className="flex items-center gap-4">
               <h1 className="text-3xl font-bold tracking-tight">
-                {currentView === 'dashboard' ? 'Panel de Control' : 'Directorio de Jugadores'}
+                {currentView === 'dashboard' ? 'Panel de Control' : currentView === 'jugadores' ? 'Directorio de Jugadores' : 'Gestión de Validaciones'}
               </h1>
               <button
                 onClick={fetchData}
@@ -443,8 +444,10 @@ export default function Dashboard() {
               </div>
             </div>
           </>
-        ) : (
+        ) : currentView === 'jugadores' ? (
           <JugadoresView players={players} onSelectPlayer={setSelectedPlayer} />
+        ) : (
+          <ValidacionesView players={players} onSelectPlayer={setSelectedPlayer} />
         )}
       </main>
 
@@ -844,4 +847,159 @@ function JugadoresView({ players, onSelectPlayer }: { players: Player[], onSelec
       })}
     </div>
   );
+}
+
+function ValidacionesView({ players, onSelectPlayer }: { players: Player[], onSelectPlayer: (p: Player) => void }) {
+  const [filterStatus, setFilterStatus] = useState("Todos");
+  const [filterSerie, setFilterSerie] = useState("Todos");
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+
+  const series = Array.from(new Set(players.map(p => p.Serie).filter(Boolean)));
+  
+  const filtered = players.filter(p => {
+    const statusVal = (p.Status_Validacion || "Pendiente").toUpperCase();
+    let statusMatch = filterStatus === "Todos";
+    if (filterStatus === "PENDIENTE" && statusVal === "PENDIENTE") statusMatch = true;
+    if (filterStatus === "POR FEDERAR" && statusVal === "POR FEDERAR") statusMatch = true;
+    if (filterStatus === "FEDERADO" && (statusVal === "FEDERADO" || statusVal === "APROBADO")) statusMatch = true;
+    
+    const serieMatch = filterSerie === "Todos" || p.Serie === filterSerie;
+    return statusMatch && serieMatch;
+  });
+
+  return (
+     <div className="space-y-6">
+       <div className="flex flex-col md:flex-row gap-4 justify-between items-center glass-card p-4">
+         <div className="flex gap-4 items-center">
+           <Filter className="w-5 h-5 text-brand-500" />
+           <select className="input-field py-2 text-sm" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+             <option value="Todos">Todos los Estados</option>
+             <option value="PENDIENTE">Solo Pendientes</option>
+             <option value="POR FEDERAR">Solo Por Federar</option>
+             <option value="FEDERADO">Solo Federados</option>
+           </select>
+           
+           <select className="input-field py-2 text-sm" value={filterSerie} onChange={e => setFilterSerie(e.target.value)}>
+             <option value="Todos">Todas las Series</option>
+             {series.map(s => <option key={s} value={s}>{s}</option>)}
+           </select>
+         </div>
+         <button onClick={() => setIsExportModalOpen(true)} className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors">
+           <Download className="w-4 h-4" /> Exportar a Excel ({filtered.length})
+         </button>
+       </div>
+
+       {/* Table */}
+       <div className="glass-card overflow-hidden">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="text-slate-500 text-sm border-b border-slate-800 bg-slate-900/20">
+                <th className="px-6 py-4 font-medium">Jugador</th>
+                <th className="px-6 py-4 font-medium">Serie</th>
+                <th className="px-6 py-4 font-medium">Estado de Validación</th>
+                <th className="px-6 py-4 font-medium">Fecha Reg.</th>
+                <th className="px-6 py-4 font-medium"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800">
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="p-8 text-center text-slate-500">No hay jugadores que coincidan con estos filtros.</td>
+                </tr>
+              )}
+              {filtered.map((player, i) => (
+                <tr key={i} onClick={() => onSelectPlayer(player)} className="hover:bg-slate-900/50 transition-colors cursor-pointer group">
+                  <td className="px-6 py-4">
+                    <div className="font-medium text-slate-200">{player.Nombres || player.Nombre} {player.Apellido_Paterno || player.Apellidos}</div>
+                    <div className="text-xs text-slate-500 font-mono mt-0.5">{player.RUT}</div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="text-sm text-slate-300 bg-slate-800/50 px-2 py-1 rounded-md border border-slate-700/50">{player.Serie}</span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium border inline-flex items-center gap-1 ${
+                        player.Status_Validacion?.toUpperCase() === 'FEDERADO' || player.Status_Validacion?.toUpperCase() === 'APROBADO' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                        player.Status_Validacion?.toUpperCase() === 'POR FEDERAR' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
+                        'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                      }`}>
+                      {(player.Status_Validacion || 'PENDIENTE').toUpperCase()}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-slate-400 text-sm">
+                    {player.Fecha_Registro ? new Date(player.Fecha_Registro).toLocaleDateString() : 'N/A'}
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-brand-400 transition-colors ml-auto" />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+       </div>
+
+       {isExportModalOpen && <ExportModal players={filtered} onClose={() => setIsExportModalOpen(false)} />}
+     </div>
+  );
+}
+
+function ExportModal({ players, onClose }: { players: Player[], onClose: () => void }) {
+   const allFields = ['RUT', 'Nombres', 'Apellido_Paterno', 'Apellido_Materno', 'Fecha_Nacimiento', 'Nacionalidad', 'Serie', 'WhatsApp', 'Direccion', 'Posicion', 'Status_Validacion', 'Fecha_Registro'];
+   const [selectedFields, setSelectedFields] = useState<string[]>(allFields);
+   
+   const toggleField = (field: string) => {
+     if (selectedFields.includes(field)) setSelectedFields(selectedFields.filter(f => f !== field));
+     else setSelectedFields([...selectedFields, field]);
+   };
+
+   const handleExport = () => {
+     if (selectedFields.length === 0) return alert("Selecciona al menos 1 campo.");
+     
+     // Evitar problemas de tildes añadiendo BOM de Excel
+     const BOM = "\uFEFF";
+     const header = selectedFields.join(";");
+     const rows = players.map(p => selectedFields.map(f => {
+       const val = p[f as keyof Player] || "";
+       // Envolver en comillas y reemplazar comillas internas
+       return `"${val.toString().replace(/"/g, '""')}"`;
+     }).join(";"));
+     
+     const csvContent = BOM + header + "\n" + rows.join("\n");
+     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+     const link = document.createElement("a");
+     const url = URL.createObjectURL(blob);
+     
+     link.setAttribute("href", url);
+     link.setAttribute("download", `ValleGrande_Validaciones_${new Date().toISOString().split('T')[0]}.csv`);
+     document.body.appendChild(link);
+     link.click();
+     document.body.removeChild(link);
+     onClose();
+   };
+
+   return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+        <div className="glass-card w-full max-w-md shadow-2xl shadow-black overflow-hidden border border-slate-700">
+          <div className="bg-slate-900/90 p-6 border-b border-slate-800">
+            <h2 className="text-xl font-bold text-white flex items-center gap-2"><Download className="w-5 h-5 text-brand-500" /> Exportar Selección</h2>
+            <p className="text-sm text-slate-400 mt-1">Elige las columnas que aparecerán en tu Excel.</p>
+          </div>
+          
+          <div className="p-6 grid grid-cols-2 gap-3 max-h-[60vh] overflow-y-auto">
+            {allFields.map(field => (
+               <label key={field} className="flex items-center gap-2 cursor-pointer p-2 rounded hover:bg-slate-800/50 transition-colors">
+                 <input type="checkbox" className="accent-brand-500" checked={selectedFields.includes(field)} onChange={() => toggleField(field)} />
+                 <span className="text-sm text-slate-300">{field.replace(/_/g, ' ')}</span>
+               </label>
+            ))}
+          </div>
+
+          <div className="p-6 border-t border-slate-800 bg-slate-900/50 flex justify-end gap-3">
+            <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-slate-400 hover:text-white transition-colors">Cancelar</button>
+            <button onClick={handleExport} className="bg-emerald-600 hover:bg-emerald-500 text-white py-2 px-6 rounded-lg text-sm font-bold transition-colors">
+              Descargar Archivo CSV
+            </button>
+          </div>
+        </div>
+      </div>
+   );
 }
