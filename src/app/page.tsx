@@ -28,10 +28,8 @@ import {
   Image as ImageIcon,
   Download,
   Filter,
-  Upload,
-  LogOut
+  Upload
 } from "lucide-react";
-import { useAuth } from "@/context/AuthContext";
 
 interface Player {
   ID_Jugador: string;
@@ -45,7 +43,6 @@ interface Player {
 }
 
 export default function Dashboard() {
-  const { logout } = useAuth();
   const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -306,17 +303,7 @@ export default function Dashboard() {
            <NavItem icon={Users} label="Jugadores" active={currentView === 'jugadores'} onClick={() => setCurrentView('jugadores')} />
            <NavItem icon={Clock} label="Validaciones" active={currentView === 'validaciones'} onClick={() => setCurrentView('validaciones')} />
          </nav>
-         
-         <div className="mt-auto pt-6 border-t border-slate-800">
-           <button
-             onClick={logout}
-             className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
-           >
-             <LogOut className="w-5 h-5" />
-             <span className="font-medium">Cerrar Sesión</span>
-           </button>
-         </div>
-       </aside>
+        </aside>
 
       {/* Main Content */}
       <main className="flex-1 p-4 md:p-10 overflow-y-auto">
