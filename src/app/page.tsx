@@ -230,10 +230,26 @@ export default function Dashboard() {
 
   const stats = [
     { label: "Total Jugadores", value: players.length, icon: Users, color: "text-blue-500", bg: "bg-blue-500/10" },
-    { label: "Pendientes", value: players.filter(p => p.Status_Validacion === 'Pendiente').length, icon: Clock, iconColor: "text-amber-500", bg: "bg-amber-500/10" },
-    { label: "Aprobados", value: players.filter(p => p.Status_Validacion === 'Aprobado').length, icon: CheckCircle2, iconColor: "text-emerald-500", bg: "bg-emerald-500/10" },
-    { label: "Rechazados", value: players.filter(p => p.Status_Validacion === 'Rechazado').length, icon: AlertCircle, iconColor: "text-rose-500", bg: "bg-rose-500/10" },
+    { label: "Pendientes", value: players.filter(p => !p.Status_Validacion || p.Status_Validacion.toUpperCase() === 'PENDIENTE').length, icon: Clock, iconColor: "text-amber-500", bg: "bg-amber-500/10" },
+    { label: "Por Federar", value: players.filter(p => p.Status_Validacion?.toUpperCase() === 'POR FEDERAR').length, icon: AlertCircle, iconColor: "text-blue-500", bg: "bg-blue-500/10" },
+    { label: "Federados", value: players.filter(p => p.Status_Validacion?.toUpperCase() === 'FEDERADO' || p.Status_Validacion?.toUpperCase() === 'APROBADO').length, icon: CheckCircle2, iconColor: "text-emerald-500", bg: "bg-emerald-500/10" },
   ];
+
+  // Datos para gráfica de Series
+  const seriesCount = players.reduce((acc, p) => {
+    const s = p.Serie || "Sin Serie";
+    acc[s] = (acc[s] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+  
+  const seriesChartData = Object.entries(seriesCount)
+    .sort((a, b) => b[1] - a[1]) // Ordenar de mayor a menor
+    .map(([name, count]) => ({
+      name,
+      count,
+      percentage: Math.round((count / (players.length || 1)) * 100)
+    }));
+
 
   const filteredPlayers = players.filter(p => {
     const nombre = p.Nombres || p.Nombre || "";
@@ -277,7 +293,6 @@ export default function Dashboard() {
           <NavItem icon={LayoutDashboard} label="Dashboard" active={currentView === 'dashboard'} onClick={() => setCurrentView('dashboard')} />
           <NavItem icon={Users} label="Jugadores" active={currentView === 'jugadores'} onClick={() => setCurrentView('jugadores')} />
           <NavItem icon={Clock} label="Validaciones" />
-          <NavItem icon={TrendingUp} label="Reportes" />
         </nav>
       </aside>
 
@@ -377,11 +392,12 @@ export default function Dashboard() {
                               </span>
                             </td>
                             <td className="px-6 py-4">
-                              <span className={`px-3 py-1 rounded-full text-xs font-medium border ${player.Status_Validacion === 'Aprobado' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-                                  player.Status_Validacion === 'Pendiente' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
-                                    'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                              <span className={`px-3 py-1 rounded-full text-xs font-medium border ${
+                                  player.Status_Validacion?.toUpperCase() === 'FEDERADO' || player.Status_Validacion?.toUpperCase() === 'APROBADO' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                                  player.Status_Validacion?.toUpperCase() === 'POR FEDERAR' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
+                                  'bg-amber-500/10 text-amber-400 border-amber-500/20'
                                 }`}>
-                                {player.Status_Validacion || 'Pendiente'}
+                                {(player.Status_Validacion || 'PENDIENTE').toUpperCase()}
                               </span>
                             </td>
                             <td className="px-6 py-4 text-right">
@@ -395,22 +411,35 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* Activity Feed */}
-              <div className="glass-card p-6 h-fit">
-                <h2 className="font-semibold text-lg mb-6">Información</h2>
-                <div className="bg-brand-500/10 border border-brand-500/20 p-4 rounded-xl mb-6">
-                  <p className="text-xs text-brand-400 font-bold uppercase tracking-wider mb-1">Estado de Sincronización</p>
-                  <p className="text-sm text-slate-300">Conectado a Google Sheets exitosamente.</p>
-                </div>
-                <div className="space-y-4">
-                  <p className="text-sm text-slate-400 leading-relaxed">
-                    Usa el botón <strong>Nuevo Jugador</strong> para agregar registros.
-                  </p>
-                  <div className="p-4 bg-slate-900/50 rounded-xl border border-slate-800">
-                    <p className="text-xs text-slate-500 mb-2">Última actualización local:</p>
-                    <p className="text-sm font-mono text-slate-300">{new Date().toLocaleTimeString()}</p>
+              {/* Métricas por Serie (Gráfica) */}
+              <div className="glass-card p-6 h-fit flex flex-col max-h-[500px]">
+                <h2 className="font-semibold text-lg mb-6 flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-brand-500" />
+                  Distribución por Serie
+                </h2>
+                
+                {seriesChartData.length === 0 ? (
+                  <p className="text-sm text-slate-500 text-center py-10">No hay datos disponibles.</p>
+                ) : (
+                  <div className="space-y-5 overflow-y-auto pr-2 custom-scrollbar">
+                    {seriesChartData.map((serie, i) => (
+                      <div key={i} className="group">
+                        <div className="flex justify-between text-sm mb-1.5">
+                          <span className="font-medium text-slate-300 group-hover:text-brand-400 transition-colors">{serie.name}</span>
+                          <span className="text-slate-400 font-mono text-xs">{serie.count} Jug. ({serie.percentage}%)</span>
+                        </div>
+                        <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden flex">
+                          <div 
+                            className="h-full bg-gradient-to-r from-brand-600 to-brand-400 rounded-full relative overflow-hidden" 
+                            style={{ width: `${serie.percentage}%` }}
+                          >
+                            <div className="absolute inset-0 bg-white/20 w-full h-full animate-[shimmer_2s_infinite] -translate-x-full"></div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                </div>
+                )}
               </div>
             </div>
           </>
