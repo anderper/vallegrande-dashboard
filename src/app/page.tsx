@@ -1126,11 +1126,4 @@ function ImportModal({ onClose, onRefresh }: { onClose: () => void, onRefresh: (
       </div>
     </div>
   );
-} className="bg-emerald-600 hover:bg-emerald-500 text-white py-2 px-6 rounded-lg text-sm font-bold transition-colors">
-              Descargar Archivo CSV
-            </button>
-          </div>
-        </div>
-      </div>
-   );
 }
