@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import LoginModalWrapper from "@/components/LoginModalWrapper";
+import { usePathname } from "next/navigation";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -16,12 +17,15 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const pathname = usePathname();
+  const isRegistro = pathname === "/registro";
+
   return (
     <html lang="es" className="dark">
       <body className={`${inter.className} bg-slate-950 text-slate-50 min-h-screen`}>
         <AuthProvider>
           {children}
-          <LoginModalWrapper />
+          {!isRegistro && <LoginModalWrapper />}
         </AuthProvider>
       </body>
     </html>
