@@ -23,10 +23,12 @@ import {
   ChevronDown,
   ChevronUp,
   UploadCloud,
+  FileText,
   ShieldCheck,
   Image as ImageIcon,
   Download,
-  Filter
+  Filter,
+  Upload
 } from "lucide-react";
 
 interface Player {
@@ -48,6 +50,7 @@ export default function Dashboard() {
 
   // Estados para el Modal de Registro
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Estados para el Perfil del Jugador
@@ -239,16 +242,21 @@ export default function Dashboard() {
   // Datos para gráfica de Series
   const seriesCount = players.reduce((acc, p) => {
     const s = p.Serie || "Sin Serie";
-    acc[s] = (acc[s] || 0) + 1;
+    if (!acc[s]) acc[s] = { total: 0, federados: 0 };
+    acc[s].total += 1;
+    if (p.Status_Validacion?.toUpperCase() === 'FEDERADO' || p.Status_Validacion?.toUpperCase() === 'APROBADO') {
+      acc[s].federados += 1;
+    }
     return acc;
-  }, {} as Record<string, number>);
+  }, {} as Record<string, { total: number, federados: number }>);
   
   const seriesChartData = Object.entries(seriesCount)
-    .sort((a, b) => b[1] - a[1]) // Ordenar de mayor a menor
-    .map(([name, count]) => ({
+    .sort((a, b) => b[1].total - a[1].total) // Ordenar de mayor a menor
+    .map(([name, data]) => ({
       name,
-      count,
-      percentage: Math.round((count / (players.length || 1)) * 100)
+      count: data.total,
+      federados: data.federados,
+      percentage: Math.round((data.total / (players.length || 1)) * 100)
     }));
 
 
@@ -329,6 +337,9 @@ export default function Dashboard() {
                 />
               </div>
             )}
+            <button onClick={() => setIsImportModalOpen(true)} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm font-bold transition-colors flex items-center gap-2">
+              <Upload className="w-4 h-4" /> Importar
+            </button>
             <button onClick={() => setIsModalOpen(true)} className="btn-primary py-2 text-sm">
               <Plus className="w-4 h-4" />
               Nuevo Jugador
@@ -427,7 +438,7 @@ export default function Dashboard() {
                       <div key={i} className="group">
                         <div className="flex justify-between text-sm mb-1.5">
                           <span className="font-medium text-slate-300 group-hover:text-brand-400 transition-colors">{serie.name}</span>
-                          <span className="text-slate-400 font-mono text-xs">{serie.count} Jug. ({serie.percentage}%)</span>
+                          <span className="text-slate-400 font-mono text-xs">{serie.count} Jug. <span className="text-emerald-400">({serie.federados} Fed.)</span></span>
                         </div>
                         <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden flex">
                           <div 
@@ -450,6 +461,9 @@ export default function Dashboard() {
           <ValidacionesView players={players} onSelectPlayer={setSelectedPlayer} />
         )}
       </main>
+
+      {/* Modal Importar */}
+      {isImportModalOpen && <ImportModal onClose={() => setIsImportModalOpen(false)} onRefresh={fetchData} />}
 
       {/* Modal de Registro */}
       {isModalOpen && (
@@ -996,6 +1010,123 @@ function ExportModal({ players, onClose }: { players: Player[], onClose: () => v
           <div className="p-6 border-t border-slate-800 bg-slate-900/50 flex justify-end gap-3">
             <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-slate-400 hover:text-white transition-colors">Cancelar</button>
             <button onClick={handleExport} className="bg-emerald-600 hover:bg-emerald-500 text-white py-2 px-6 rounded-lg text-sm font-bold transition-colors">
+              Descargar Archivo CSV
+            </button>
+          </div>
+        </div>
+      </div>
+   );
+}
+
+function ImportModal({ onClose, onRefresh }: { onClose: () => void, onRefresh: () => void }) {
+  const [file, setFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+
+  const downloadTemplate = () => {
+    const header = "RUT;Nombres;Apellido_Paterno;Apellido_Materno;Fecha_Nacimiento;Nacionalidad;Serie;WhatsApp;Direccion;Posicion;Observaciones";
+    const blob = new Blob(["\uFEFF" + header], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "Plantilla_ValleGrande.csv";
+    link.click();
+  };
+
+  const handleImport = async () => {
+    if (!file) return;
+    setIsUploading(true);
+    
+    try {
+      const text = await file.text();
+      // Soporte para comas o punto y comas
+      const separator = text.includes(";") ? ";" : ",";
+      const rows = text.split('\n').map(row => row.trim()).filter(Boolean);
+      
+      if (rows.length < 2) throw new Error("El archivo está vacío o no tiene datos.");
+      
+      const headers = rows[0].split(separator).map(h => h.replace(/^"|"$/g, '').trim());
+      const rutIndex = headers.findIndex(h => h.toUpperCase().includes("RUT"));
+      
+      if (rutIndex === -1) throw new Error("La columna RUT es obligatoria.");
+
+      const playersToUpload = [];
+      for (let i = 1; i < rows.length; i++) {
+        // Expresión regular para hacer split considerando posibles comillas CSV
+        const columns = rows[i].split(new RegExp(`\\s*${separator}\\s*(?=(?:[^"]*"[^"]*")*[^"]*$)`)).map(c => c.replace(/^"|"$/g, '').trim());
+        if (!columns[rutIndex]) continue;
+        
+        let obj: any = {};
+        headers.forEach((h, idx) => {
+          obj[h] = columns[idx] || "";
+        });
+        playersToUpload.push(obj);
+      }
+
+      if (playersToUpload.length === 0) throw new Error("No se encontraron jugadores válidos.");
+
+      const res = await fetch('/api/players', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: "BULK_CREATE", players: playersToUpload })
+      });
+
+      const result = await res.json();
+      if (result.success) {
+        alert(`¡Se importaron ${playersToUpload.length} jugadores con éxito!`);
+        onRefresh();
+        onClose();
+      } else {
+        alert("Error de Apps Script: " + result.error);
+      }
+    } catch(err: any) {
+       alert("Error procesando el archivo: " + err.message);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <div className="glass-card w-full max-w-md shadow-2xl shadow-black overflow-hidden border border-slate-700">
+        <div className="bg-slate-900/90 p-6 border-b border-slate-800 flex justify-between items-start">
+          <div>
+            <h2 className="text-xl font-bold text-white flex items-center gap-2"><UploadCloud className="w-5 h-5 text-brand-500" /> Carga Masiva</h2>
+            <p className="text-sm text-slate-400 mt-1">Sube cientos de jugadores de un golpe usando un CSV.</p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
+        </div>
+        
+        <div className="p-6 space-y-6">
+          <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl">
+            <p className="text-sm text-blue-300 mb-3"><strong>Paso 1:</strong> Descarga la plantilla oficial. Rellénala en Excel y asegúrate de guardarla como <strong>"CSV (delimitado por comas)"</strong>.</p>
+            <button onClick={downloadTemplate} className="w-full bg-blue-600/20 hover:bg-blue-600/40 border border-blue-500/50 text-blue-400 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-colors">
+              <Download className="w-4 h-4" /> Descargar Plantilla CSV
+            </button>
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-sm text-slate-300"><strong>Paso 2:</strong> Sube el archivo CSV rellenado.</p>
+            <div className="relative border-2 border-dashed border-slate-700 hover:border-brand-500 rounded-xl p-8 text-center cursor-pointer transition-colors group">
+              <input type="file" accept=".csv" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={(e) => {
+                if (e.target.files && e.target.files[0]) setFile(e.target.files[0]);
+              }} />
+              <UploadCloud className={`w-8 h-8 mx-auto mb-2 ${file ? 'text-brand-400' : 'text-slate-500 group-hover:text-brand-400'}`} />
+              <span className="text-sm font-medium text-slate-300 block mb-1">{file ? file.name : "Haz clic para subir"}</span>
+              <span className="text-xs text-slate-500">Solo archivos .csv</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-6 border-t border-slate-800 bg-slate-900/50 flex justify-end gap-3">
+          <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-slate-400 hover:text-white transition-colors">Cancelar</button>
+          <button onClick={handleImport} disabled={!file || isUploading} className="btn-primary py-2 px-6 text-sm disabled:opacity-50 flex items-center gap-2">
+            {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+            {isUploading ? "Procesando..." : "Importar Jugadores"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+} className="bg-emerald-600 hover:bg-emerald-500 text-white py-2 px-6 rounded-lg text-sm font-bold transition-colors">
               Descargar Archivo CSV
             </button>
           </div>
