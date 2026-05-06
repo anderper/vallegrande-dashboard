@@ -104,6 +104,15 @@ export default function RegistroPublico() {
     return data.secure_url;
   };
 
+  const getBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = (e) => reject(e);
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -129,15 +138,14 @@ export default function RegistroPublico() {
     setError(null);
     
     try {
-      setUploadProgress("Subiendo documentos del jugador...");
-      const frontalUrl = await uploadToCloudinary(await compressImage(files.frontal));
-      const reversoUrl = await uploadToCloudinary(await compressImage(files.reverso));
+      setUploadProgress("Subiendo cédula frontal...");
+      const frontalUrl = await uploadToCloudinary(await compressImage(files.frontal!));
       
-      const reader = new FileReader();
-      const antecedentesUrl = await new Promise<string>((resolve) => {
-        reader.readAsDataURL(files.antecedentes!);
-        reader.onload = async () => resolve(await uploadToCloudinary(reader.result as string));
-      });
+      setUploadProgress("Subiendo cédula reverso...");
+      const reversoUrl = await uploadToCloudinary(await compressImage(files.reverso!));
+      
+      setUploadProgress("Subiendo antecedentes...");
+      const antecedentesUrl = await uploadToCloudinary(await getBase64(files.antecedentes!));
 
       let frontalApoderadoUrl = "";
       let reversoApoderadoUrl = "";
@@ -155,7 +163,6 @@ export default function RegistroPublico() {
         Foto_Cedula_Frontal: frontalUrl,
         Foto_Cedula_Reverso: reversoUrl,
         Antecedentes_PDF: antecedentesUrl,
-        // Usamos campos genéricos o observaciones para los datos del apoderado si no existen columnas específicas
         Observaciones: isMinor 
           ? `${formData.Observaciones} | APODERADO OK | Doc Apoderado: ${frontalApoderadoUrl} , ${reversoApoderadoUrl}`
           : formData.Observaciones,
