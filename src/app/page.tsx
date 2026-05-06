@@ -382,7 +382,7 @@ export default function Dashboard() {
 <nav className="space-y-1">
            <NavItem icon={LayoutDashboard} label="Dashboard" active={currentView === 'dashboard'} onClick={() => setCurrentView('dashboard')} />
            <NavItem icon={Users} label="Jugadores" active={currentView === 'jugadores'} onClick={() => setCurrentView('jugadores')} />
-           <NavItem icon={Clock} label="Validaciones" active={currentView === 'validaciones'} onClick={() => setCurrentView('validaciones')} />
+           <NavItem icon={Clock} label="Reportabilidad" active={currentView === 'validaciones'} onClick={() => setCurrentView('validaciones')} />
          </nav>
         </aside>
 
@@ -392,7 +392,7 @@ export default function Dashboard() {
           <div className="flex justify-between items-start w-full md:w-auto">
             <div className="flex items-center gap-4">
               <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
-                {currentView === 'dashboard' ? 'Panel de Control' : currentView === 'jugadores' ? 'Directorio de Jugadores' : 'Gestión de Validaciones'}
+                {currentView === 'dashboard' ? 'Panel de Control' : currentView === 'jugadores' ? 'Directorio de Jugadores' : 'Reportabilidad & Listas'}
               </h1>
               <button
                 onClick={fetchData}
@@ -558,7 +558,7 @@ export default function Dashboard() {
         </button>
         <button onClick={() => setCurrentView('validaciones')} className={`flex flex-col items-center gap-1 transition-colors ${currentView === 'validaciones' ? 'text-brand-500' : 'text-slate-500'}`}>
           <Clock className="w-5 h-5" />
-          <span className="text-[10px] font-medium">Validar</span>
+          <span className="text-[10px] font-medium">Reportes</span>
         </button>
       </nav>
 
@@ -1130,7 +1130,8 @@ function ValidacionesView({ players, onSelectPlayer }: { players: Player[], onSe
 }
 
 function ExportModal({ players, onClose }: { players: Player[], onClose: () => void }) {
-   const allFields = ['RUT', 'Nombres', 'Apellido_Paterno', 'Apellido_Materno', 'Fecha_Nacimiento', 'Nacionalidad', 'Serie', 'WhatsApp', 'Direccion', 'Posicion', 'Status_Validacion', 'Fecha_Registro'];
+   const allFields = ['RUT', 'Nombres', 'Apellido_Paterno', 'Apellido_Materno', 'Fecha_Nacimiento', 'Nacionalidad', 'Serie', 'WhatsApp', 'Direccion', 'Posicion', 'Status_Validacion', 'Foto_Cedula_Frontal', 'Foto_Cedula_Reverso', 'Antecedentes_PDF'];
+
    const [selectedFields, setSelectedFields] = useState<string[]>(allFields);
    
    const toggleField = (field: string) => {
