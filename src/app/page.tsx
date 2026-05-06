@@ -124,20 +124,20 @@ export default function Dashboard() {
       const docPayload: any = {};
       
       if (registrationFiles.frontal) {
-        docPayload.Foto_Cedula_Frontal = await uploadToCloudinary(await compressImage(registrationFiles.frontal));
+        docPayload.Foto_Cedula_Frontal = await uploadToCloudinary(await compressImage(registrationFiles.frontal), 'image');
       }
       if (registrationFiles.reverso) {
-        docPayload.Foto_Cedula_Reverso = await uploadToCloudinary(await compressImage(registrationFiles.reverso));
+        docPayload.Foto_Cedula_Reverso = await uploadToCloudinary(await compressImage(registrationFiles.reverso), 'image');
       }
       if (registrationFiles.antecedentes) {
-        docPayload.Antecedentes_PDF = await uploadToCloudinary(await getBase64(registrationFiles.antecedentes));
+        docPayload.Antecedentes_PDF = await uploadToCloudinary(await getBase64(registrationFiles.antecedentes), 'raw');
       }
 
       // Si es menor y hay documentos de apoderado, los metemos en observaciones o campos extra
       let obs = formData.Observaciones;
       if (isMinor && registrationFiles.frontalApoderado && registrationFiles.reversoApoderado) {
-        const apFrontal = await uploadToCloudinary(await compressImage(registrationFiles.frontalApoderado));
-        const apReverso = await uploadToCloudinary(await compressImage(registrationFiles.reversoApoderado));
+        const apFrontal = await uploadToCloudinary(await compressImage(registrationFiles.frontalApoderado), 'image');
+        const apReverso = await uploadToCloudinary(await compressImage(registrationFiles.reversoApoderado), 'image');
         obs = `${obs} | APODERADO OK | Doc Apoderado: ${apFrontal} , ${apReverso}`;
       }
 
@@ -217,21 +217,20 @@ export default function Dashboard() {
     });
   };
 
-  const uploadToCloudinary = async (fileData: string) => {
+  const uploadToCloudinary = async (fileData: string, resourceType: 'image' | 'raw' = 'image') => {
     const formData = new FormData();
     formData.append('file', fileData);
     formData.append('upload_preset', 'vallegrande_docs');
-    formData.append('resource_type', 'auto');
 
-    const res = await fetch(`https://api.cloudinary.com/v1_1/dppv8v6bt/auto/upload`, {
+    const res = await fetch(`https://api.cloudinary.com/v1_1/dppv8v6bt/${resourceType}/upload`, {
       method: 'POST',
       body: formData
     });
     
     const data = await res.json();
     if (!res.ok) {
-      console.error("Cloudinary Error Details:", data);
-      throw new Error(data.error?.message || "Error al subir a la nube");
+      console.error(`Cloudinary ${resourceType} Error:`, data);
+      throw new Error(data.error?.message || `Error al subir ${resourceType} a la nube`);
     }
     return data.secure_url;
   };
@@ -247,13 +246,13 @@ export default function Dashboard() {
       };
 
       if (selectedFiles.frontal) {
-        payload.Foto_Cedula_Frontal = await uploadToCloudinary(await compressImage(selectedFiles.frontal));
+        payload.Foto_Cedula_Frontal = await uploadToCloudinary(await compressImage(selectedFiles.frontal), 'image');
       }
       if (selectedFiles.reverso) {
-        payload.Foto_Cedula_Reverso = await uploadToCloudinary(await compressImage(selectedFiles.reverso));
+        payload.Foto_Cedula_Reverso = await uploadToCloudinary(await compressImage(selectedFiles.reverso), 'image');
       }
       if (selectedFiles.antecedentes) {
-        payload.Antecedentes_PDF = await uploadToCloudinary(await getBase64(selectedFiles.antecedentes));
+        payload.Antecedentes_PDF = await uploadToCloudinary(await getBase64(selectedFiles.antecedentes), 'raw');
       }
 
       // Evaluar Auto-Status

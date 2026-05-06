@@ -91,21 +91,20 @@ export default function RegistroPublico() {
     });
   };
 
-  const uploadToCloudinary = async (fileData: string) => {
+  const uploadToCloudinary = async (fileData: string, resourceType: 'image' | 'raw' = 'image') => {
     const formData = new FormData();
     formData.append('file', fileData);
     formData.append('upload_preset', 'vallegrande_docs');
-    formData.append('resource_type', 'auto');
 
-    const res = await fetch(`https://api.cloudinary.com/v1_1/dppv8v6bt/auto/upload`, {
+    const res = await fetch(`https://api.cloudinary.com/v1_1/dppv8v6bt/${resourceType}/upload`, {
       method: 'POST',
       body: formData
     });
     
     const data = await res.json();
     if (!res.ok) {
-      console.error("Cloudinary Error Details:", data);
-      throw new Error(data.error?.message || "Error al subir a la nube");
+      console.error(`Cloudinary ${resourceType} Error:`, data);
+      throw new Error(data.error?.message || `Error al subir ${resourceType} a la nube`);
     }
     return data.secure_url;
   };
@@ -145,21 +144,21 @@ export default function RegistroPublico() {
     
     try {
       setUploadProgress("Subiendo cédula frontal...");
-      const frontalUrl = await uploadToCloudinary(await compressImage(files.frontal!));
+      const frontalUrl = await uploadToCloudinary(await compressImage(files.frontal!), 'image');
       
       setUploadProgress("Subiendo cédula reverso...");
-      const reversoUrl = await uploadToCloudinary(await compressImage(files.reverso!));
+      const reversoUrl = await uploadToCloudinary(await compressImage(files.reverso!), 'image');
       
       setUploadProgress("Subiendo antecedentes...");
-      const antecedentesUrl = await uploadToCloudinary(await getBase64(files.antecedentes!));
+      const antecedentesUrl = await uploadToCloudinary(await getBase64(files.antecedentes!), 'raw');
 
       let frontalApoderadoUrl = "";
       let reversoApoderadoUrl = "";
 
       if (isMinor) {
         setUploadProgress("Subiendo documentos del apoderado...");
-        frontalApoderadoUrl = await uploadToCloudinary(await compressImage(files.frontalApoderado!));
-        reversoApoderadoUrl = await uploadToCloudinary(await compressImage(files.reversoApoderado!));
+        frontalApoderadoUrl = await uploadToCloudinary(await compressImage(files.frontalApoderado!), 'image');
+        reversoApoderadoUrl = await uploadToCloudinary(await compressImage(files.reversoApoderado!), 'image');
       }
 
       setUploadProgress("Finalizando registro...");
