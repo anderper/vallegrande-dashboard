@@ -69,55 +69,54 @@ export default function RegistroPublico() {
     setFiles(prev => ({ ...prev, [type]: file }));
   };
 
-  const compressImage = (file: File): Promise<string> => {
-    return new Promise((resolve) => {
+
+  // Sube un archivo directamente a Cloudinary usando el File nativo
+  const uploadFile = async (file: File): Promise<string> => {
+    const fd = new FormData();
+    // Para PDFs usamos el endpoint raw, para imágenes el de image
+    const isPdf = file.type === 'application/pdf';
+    fd.append('file', file);
+    fd.append('upload_preset', 'vallegrande_docs');
+
+    const endpoint = isPdf
+      ? `https://api.cloudinary.com/v1_1/dppv8v6bt/raw/upload`
+      : `https://api.cloudinary.com/v1_1/dppv8v6bt/image/upload`;
+
+    const res = await fetch(endpoint, { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!res.ok) {
+      console.error('Cloudinary Error:', data);
+      throw new Error(data?.error?.message || 'Error al subir archivo');
+    }
+    return data.secure_url;
+  };
+
+  // Comprime una imagen y devuelve un Blob/File listo para subir
+  const compressImageToFile = (file: File): Promise<File> => {
+    return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
+      reader.onerror = reject;
       reader.onload = (event) => {
         const img = new Image();
         img.src = event.target?.result as string;
+        img.onerror = reject;
         img.onload = () => {
           const canvas = document.createElement('canvas');
           const MAX_WIDTH = 1024;
-          let scaleSize = 1;
-          if (img.width > MAX_WIDTH) scaleSize = MAX_WIDTH / img.width;
-          canvas.width = img.width * scaleSize;
-          canvas.height = img.height * scaleSize;
-          const ctx = canvas.getContext('2d');
-          ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
-          resolve(canvas.toDataURL('image/jpeg', 0.7));
+          let scale = img.width > MAX_WIDTH ? MAX_WIDTH / img.width : 1;
+          canvas.width = img.width * scale;
+          canvas.height = img.height * scale;
+          canvas.getContext('2d')?.drawImage(img, 0, 0, canvas.width, canvas.height);
+          canvas.toBlob((blob) => {
+            if (!blob) return reject(new Error('Error al comprimir imagen'));
+            resolve(new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' }));
+          }, 'image/jpeg', 0.75);
         };
       };
     });
   };
 
-  const uploadToCloudinary = async (fileData: string) => {
-    const formData = new FormData();
-    formData.append('file', fileData);
-    formData.append('upload_preset', 'vallegrande_docs');
-    formData.append('resource_type', 'auto');
-
-    const res = await fetch(`https://api.cloudinary.com/v1_1/dppv8v6bt/auto/upload`, {
-      method: 'POST',
-      body: formData
-    });
-    
-    const data = await res.json();
-    if (!res.ok) {
-      console.error(`Cloudinary Error:`, data);
-      throw new Error(data.error?.message || `Error al subir a la nube`);
-    }
-    return data.secure_url;
-  };
-
-  const getBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = (e) => reject(e);
-    });
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -144,22 +143,22 @@ export default function RegistroPublico() {
     setError(null);
     
     try {
-      setUploadProgress("Subiendo cédula frontal...");
-      const frontalUrl = await uploadToCloudinary(await compressImage(files.frontal!));
+      setUploadProgress('Subiendo cédula frontal...');
+      const frontalUrl = await uploadFile(await compressImageToFile(files.frontal!));
       
-      setUploadProgress("Subiendo cédula reverso...");
-      const reversoUrl = await uploadToCloudinary(await compressImage(files.reverso!));
+      setUploadProgress('Subiendo cédula reverso...');
+      const reversoUrl = await uploadFile(await compressImageToFile(files.reverso!));
       
-      setUploadProgress("Subiendo antecedentes...");
-      const antecedentesUrl = await uploadToCloudinary(await getBase64(files.antecedentes!));
+      setUploadProgress('Subiendo antecedentes (PDF)...');
+      const antecedentesUrl = await uploadFile(files.antecedentes!);
 
-      let frontalApoderadoUrl = "";
-      let reversoApoderadoUrl = "";
+      let frontalApoderadoUrl = '';
+      let reversoApoderadoUrl = '';
 
       if (isMinor) {
-        setUploadProgress("Subiendo documentos del apoderado...");
-        frontalApoderadoUrl = await uploadToCloudinary(await compressImage(files.frontalApoderado!));
-        reversoApoderadoUrl = await uploadToCloudinary(await compressImage(files.reversoApoderado!));
+        setUploadProgress('Subiendo documentos del apoderado...');
+        frontalApoderadoUrl = await uploadFile(await compressImageToFile(files.frontalApoderado!));
+        reversoApoderadoUrl = await uploadFile(await compressImageToFile(files.reversoApoderado!));
       }
 
       setUploadProgress("Finalizando registro...");

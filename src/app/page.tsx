@@ -124,20 +124,20 @@ export default function Dashboard() {
       const docPayload: any = {};
       
       if (registrationFiles.frontal) {
-        docPayload.Foto_Cedula_Frontal = await uploadToCloudinary(await compressImage(registrationFiles.frontal));
+        docPayload.Foto_Cedula_Frontal = await uploadFile(await compressImageToFile(registrationFiles.frontal));
       }
       if (registrationFiles.reverso) {
-        docPayload.Foto_Cedula_Reverso = await uploadToCloudinary(await compressImage(registrationFiles.reverso));
+        docPayload.Foto_Cedula_Reverso = await uploadFile(await compressImageToFile(registrationFiles.reverso));
       }
       if (registrationFiles.antecedentes) {
-        docPayload.Antecedentes_PDF = await uploadToCloudinary(await getBase64(registrationFiles.antecedentes));
+        docPayload.Antecedentes_PDF = await uploadFile(registrationFiles.antecedentes);
       }
 
-      // Si es menor y hay documentos de apoderado, los metemos en observaciones o campos extra
+      // Si es menor y hay documentos de apoderado
       let obs = formData.Observaciones;
       if (isMinor && registrationFiles.frontalApoderado && registrationFiles.reversoApoderado) {
-        const apFrontal = await uploadToCloudinary(await compressImage(registrationFiles.frontalApoderado));
-        const apReverso = await uploadToCloudinary(await compressImage(registrationFiles.reversoApoderado));
+        const apFrontal = await uploadFile(await compressImageToFile(registrationFiles.frontalApoderado));
+        const apReverso = await uploadFile(await compressImageToFile(registrationFiles.reversoApoderado));
         obs = `${obs} | APODERADO OK | Doc Apoderado: ${apFrontal} , ${apReverso}`;
       }
 
@@ -180,60 +180,50 @@ export default function Dashboard() {
   };
 
   // ----- FUNCIONES DE COMPRESIÓN Y SUBIDA -----
-  const compressImage = (file: File): Promise<string> => {
+  // Sube un File directamente a Cloudinary (imágenes o PDFs)
+  const uploadFile = async (file: File): Promise<string> => {
+    const fd = new FormData();
+    const isPdf = file.type === 'application/pdf';
+    fd.append('file', file);
+    fd.append('upload_preset', 'vallegrande_docs');
+
+    const endpoint = isPdf
+      ? `https://api.cloudinary.com/v1_1/dppv8v6bt/raw/upload`
+      : `https://api.cloudinary.com/v1_1/dppv8v6bt/image/upload`;
+
+    const res = await fetch(endpoint, { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!res.ok) {
+      console.error('Cloudinary Error:', data);
+      throw new Error(data?.error?.message || 'Error al subir archivo');
+    }
+    return data.secure_url;
+  };
+
+  // Comprime una imagen y devuelve un File .jpg listo para subir
+  const compressImageToFile = (file: File): Promise<File> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
+      reader.onerror = reject;
       reader.onload = (event) => {
         const img = new Image();
         img.src = event.target?.result as string;
+        img.onerror = reject;
         img.onload = () => {
           const canvas = document.createElement('canvas');
-          const MAX_WIDTH = 1024; // Reducimos tamaño
-          let scaleSize = 1;
-          if (img.width > MAX_WIDTH) {
-            scaleSize = MAX_WIDTH / img.width;
-          }
-          canvas.width = img.width * scaleSize;
-          canvas.height = img.height * scaleSize;
-          const ctx = canvas.getContext('2d');
-          ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
-          // Comprimir a JPEG con calidad 70%
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
-          resolve(dataUrl);
+          const MAX_WIDTH = 1024;
+          const scale = img.width > MAX_WIDTH ? MAX_WIDTH / img.width : 1;
+          canvas.width = img.width * scale;
+          canvas.height = img.height * scale;
+          canvas.getContext('2d')?.drawImage(img, 0, 0, canvas.width, canvas.height);
+          canvas.toBlob((blob) => {
+            if (!blob) return reject(new Error('Error al comprimir imagen'));
+            resolve(new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' }));
+          }, 'image/jpeg', 0.75);
         };
-        img.onerror = (e) => reject(e);
       };
-      reader.onerror = (e) => reject(e);
     });
-  };
-
-  const getBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = (e) => reject(e);
-    });
-  };
-
-  const uploadToCloudinary = async (fileData: string) => {
-    const formData = new FormData();
-    formData.append('file', fileData);
-    formData.append('upload_preset', 'vallegrande_docs');
-    formData.append('resource_type', 'auto');
-
-    const res = await fetch(`https://api.cloudinary.com/v1_1/dppv8v6bt/auto/upload`, {
-      method: 'POST',
-      body: formData
-    });
-    
-    const data = await res.json();
-    if (!res.ok) {
-      console.error(`Cloudinary Error:`, data);
-      throw new Error(data.error?.message || `Error al subir a la nube`);
-    }
-    return data.secure_url;
   };
 
   const handleUpdatePlayerDocs = async (newStatus?: string) => {
@@ -247,13 +237,13 @@ export default function Dashboard() {
       };
 
       if (selectedFiles.frontal) {
-        payload.Foto_Cedula_Frontal = await uploadToCloudinary(await compressImage(selectedFiles.frontal));
+        payload.Foto_Cedula_Frontal = await uploadFile(await compressImageToFile(selectedFiles.frontal));
       }
       if (selectedFiles.reverso) {
-        payload.Foto_Cedula_Reverso = await uploadToCloudinary(await compressImage(selectedFiles.reverso));
+        payload.Foto_Cedula_Reverso = await uploadFile(await compressImageToFile(selectedFiles.reverso));
       }
       if (selectedFiles.antecedentes) {
-        payload.Antecedentes_PDF = await uploadToCloudinary(await getBase64(selectedFiles.antecedentes));
+        payload.Antecedentes_PDF = await uploadFile(selectedFiles.antecedentes);
       }
 
       // Evaluar Auto-Status
