@@ -255,48 +255,49 @@ export default function Dashboard() {
   };
 
   const stats = [
-    { label: "Total Jugadores", value: players.length, icon: Users, color: "text-blue-500", bg: "bg-blue-500/10" },
-    { label: "Pendientes", value: players.filter(p => !p.Status_Validacion || p.Status_Validacion.toUpperCase() === 'PENDIENTE').length, icon: Clock, iconColor: "text-amber-500", bg: "bg-amber-500/10" },
-    { label: "Por Federar", value: players.filter(p => p.Status_Validacion?.toUpperCase() === 'POR FEDERAR').length, icon: AlertCircle, iconColor: "text-blue-500", bg: "bg-blue-500/10" },
-    { label: "Federados", value: players.filter(p => p.Status_Validacion?.toUpperCase() === 'FEDERADO' || p.Status_Validacion?.toUpperCase() === 'APROBADO').length, icon: CheckCircle2, iconColor: "text-emerald-500", bg: "bg-emerald-500/10" },
+    { label: "Total Jugadores", value: (players || []).length, icon: Users, color: "text-blue-500", bg: "bg-blue-500/10" },
+    { label: "Pendientes", value: (players || []).filter(p => !p?.Status_Validacion || p.Status_Validacion.toString().toUpperCase() === 'PENDIENTE').length, icon: Clock, iconColor: "text-amber-500", bg: "bg-amber-500/10" },
+    { label: "Por Federar", value: (players || []).filter(p => p?.Status_Validacion?.toString().toUpperCase() === 'POR FEDERAR').length, icon: AlertCircle, iconColor: "text-blue-500", bg: "bg-blue-500/10" },
+    { label: "Federados", value: (players || []).filter(p => p?.Status_Validacion?.toString().toUpperCase() === 'FEDERADO' || p?.Status_Validacion?.toString().toUpperCase() === 'APROBADO').length, icon: CheckCircle2, iconColor: "text-emerald-500", bg: "bg-emerald-500/10" },
   ];
 
   // Datos para gráfica de Series
-  const seriesCount = players.reduce((acc, p) => {
+  const seriesCount = (players || []).reduce((acc, p) => {
+    if (!p) return acc;
     const s = p.Serie || "Sin Serie";
     if (!acc[s]) acc[s] = { total: 0, federados: 0 };
     acc[s].total += 1;
-    if (p.Status_Validacion?.toUpperCase() === 'FEDERADO' || p.Status_Validacion?.toUpperCase() === 'APROBADO') {
+    const st = (p.Status_Validacion || "").toString().toUpperCase();
+    if (st === 'FEDERADO' || st === 'APROBADO') {
       acc[s].federados += 1;
     }
     return acc;
   }, {} as Record<string, { total: number, federados: number }>);
   
   const seriesChartData = Object.entries(seriesCount)
-    .sort((a, b) => b[1].total - a[1].total) // Ordenar de mayor a menor
+    .sort((a, b) => b[1].total - a[1].total)
     .map(([name, data]) => ({
       name,
       count: data.total,
       federados: data.federados,
-      percentage: Math.round((data.total / (players.length || 1)) * 100)
+      percentage: Math.round((data.total / ((players || []).length || 1)) * 100)
     }));
 
 
-  const filteredPlayers = players.filter(p => {
+  const filteredPlayers = (players || []).filter(p => {
+    if (!p) return false;
     const nombre = p.Nombres || p.Nombre || "";
     const apellido = p.Apellido_Paterno || p.Apellidos || "";
     const rut = p.RUT || "";
     
-    // Función para quitar tildes y hacer minúsculas
-    const normalize = (str: string) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-    // Limpiamos RUTs de puntos y guiones para la búsqueda
-    const cleanRut = (r: string) => r.replace(/[\.\-]/g, '').toLowerCase();
+    const normalize = (str: any) => (str || "").toString().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    const cleanRut = (r: any) => (r || "").toString().replace(/[\.\-]/g, '').toLowerCase();
     
     const fullName = normalize(nombre + " " + apellido);
     const searchTerm = normalize(search);
     const isRutMatch = cleanRut(rut).includes(cleanRut(search));
 
-    return nombre && (fullName.includes(searchTerm) || isRutMatch);
+    return (fullName.includes(searchTerm) || isRutMatch);
   });
 
   return (
