@@ -813,17 +813,18 @@ export default function Dashboard() {
                 <button onClick={() => {setSelectedPlayer(null); setSelectedFiles({});}} className="px-6 py-2 text-sm font-medium text-slate-300 hover:text-white transition-colors">
                   Cerrar
                 </button>
-              <button 
-                onClick={() => handleUpdatePlayerDocs()}
-                disabled={isUploading || Object.keys(selectedFiles).length === 0} 
-                className="btn-primary py-2 px-6 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isUploading ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" /> Guardando en Drive...</>
-                ) : (
-                  <><Save className="w-4 h-4" /> Guardar Archivos ({Object.keys(selectedFiles).length})</>
-                )}
-              </button>
+                <button 
+                  onClick={() => handleUpdatePlayerDocs()}
+                  disabled={isUploading || Object.keys(selectedFiles).length === 0} 
+                  className="btn-primary py-2 px-6 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isUploading ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" /> Guardando en Drive...</>
+                  ) : (
+                    <><Save className="w-4 h-4" /> Guardar Archivos ({Object.keys(selectedFiles).length})</>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>
