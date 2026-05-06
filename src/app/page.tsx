@@ -200,488 +200,117 @@ export default function Dashboard() {
           ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
           // Comprimir a JPEG con calidad 70%
           const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
-          const base64 = dataUrl.split(',')[1];
-          resolve(base64);
-        };
-        img.onerror = (e) => reject(e);
-      };
-      reader.onerror = (e) => reject(e);
-    });
-  };
-
   const getBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
-      reader.onload = () => {
-        const base64 = (reader.result as string).split(',')[1];
-        resolve(base64);
-      };
+      reader.onload = () => resolve(reader.result as string);
       reader.onerror = (e) => reject(e);
     });
   };
 
-  const uploadToCloudinary = async (base64: string) => {
-    const res = await fetch(`https://api.cloudinary.com/v1_1/dppv8v6bt/image/upload`, {
+  const uploadToCloudinary = async (fileData: string) => {
+    const formData = new FormData();
+    formData.append('file', fileData);
+    formData.append('upload_preset', 'vallegrande_docs');
+    formData.append('resource_type', 'auto');
+
+    const res = await fetch(`https://api.cloudinary.com/v1_1/dppv8v6bt/auto/upload`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        file: base64,
-        upload_preset: "vallegrande_docs",
-      })
+      body: formData
     });
+    
     const data = await res.json();
-    if (!data.secure_url) {
-      console.error("Cloudinary Error:", data);
-      throw new Error("Error al subir a la nube");
-    }
+    if (!res.ok) throw new Error(data.error?.message || `Error al subir`);
     return data.secure_url;
   };
 
   const handleUpdatePlayerDocs = async (newStatus?: string) => {
     if (!selectedPlayer) return;
     setIsUploading(true);
-
     try {
-      const payload: any = { 
-        action: "UPDATE_DOCS", 
-        RUT: selectedPlayer.RUT 
-      };
-
-      if (selectedFiles.frontal) {
-        payload.Foto_Cedula_Frontal = await uploadToCloudinary(await compressImage(selectedFiles.frontal));
-      }
-      if (selectedFiles.reverso) {
-        payload.Foto_Cedula_Reverso = await uploadToCloudinary(await compressImage(selectedFiles.reverso));
-      }
-      if (selectedFiles.antecedentes) {
-        payload.Antecedentes_PDF = await uploadToCloudinary(await getBase64(selectedFiles.antecedentes));
-      }
-
-      // Evaluar Auto-Status
-      const hasFrontal = payload.Foto_Cedula_Frontal || selectedPlayer.Foto_Cedula_Frontal;
-      const hasReverso = payload.Foto_Cedula_Reverso || selectedPlayer.Foto_Cedula_Reverso;
-      const hasAntecedentes = payload.Antecedentes_PDF || selectedPlayer.Antecedentes_PDF;
+      const payload: any = { action: "UPDATE_DOCS", RUT: selectedPlayer.RUT };
+      if (selectedFiles.frontal) payload.Foto_Cedula_Frontal = await uploadToCloudinary(await getBase64(selectedFiles.frontal));
+      if (selectedFiles.reverso) payload.Foto_Cedula_Reverso = await uploadToCloudinary(await getBase64(selectedFiles.reverso));
+      if (selectedFiles.antecedentes) payload.Antecedentes_PDF = await uploadToCloudinary(await getBase64(selectedFiles.antecedentes));
       
-      let finalStatus = newStatus || selectedPlayer.Status_Validacion;
-      
-      // Auto-cambio si se subieron los 3 y está en Pendiente
-      if (!newStatus && (selectedPlayer.Status_Validacion === 'Pendiente' || !selectedPlayer.Status_Validacion)) {
-        if (hasFrontal && hasReverso && hasAntecedentes) {
-          finalStatus = "POR FEDERAR";
-        }
-      }
-
-      if (finalStatus !== selectedPlayer.Status_Validacion) {
-        payload.newStatus = finalStatus;
-      }
-
-      console.log("DEBUG: Enviando payload ACTUALIZACIÓN desde Dashboard:", payload);
+      if (newStatus) payload.newStatus = newStatus;
 
       const res = await fetch('/api/players', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-
       const result = await res.json();
       if (result.success) {
-        alert("¡Datos actualizados con éxito!");
         setSelectedFiles({});
         setSelectedPlayer(null);
         fetchData();
-      } else {
-        alert("Error de Apps Script: " + result.error);
       }
     } catch (error) {
-      console.error(error);
-      alert("Error al enviar los archivos.");
+      alert("Error al actualizar.");
     } finally {
       setIsUploading(false);
     }
   };
 
-  const stats = [
-    { label: "Total Jugadores", value: (players || []).length, icon: Users, color: "text-blue-500", bg: "bg-blue-500/10" },
-    { label: "Pendientes", value: (players || []).filter(p => !p?.Status_Validacion || p.Status_Validacion.toString().toUpperCase() === 'PENDIENTE').length, icon: Clock, iconColor: "text-amber-500", bg: "bg-amber-500/10" },
-    { label: "Por Federar", value: (players || []).filter(p => p?.Status_Validacion?.toString().toUpperCase() === 'POR FEDERAR').length, icon: AlertCircle, iconColor: "text-blue-500", bg: "bg-blue-500/10" },
-    { label: "Federados", value: (players || []).filter(p => p?.Status_Validacion?.toString().toUpperCase() === 'FEDERADO' || p?.Status_Validacion?.toString().toUpperCase() === 'APROBADO').length, icon: CheckCircle2, iconColor: "text-emerald-500", bg: "bg-emerald-500/10" },
-  ];
-
-  // Datos para gráfica de Series
-  const seriesCount = (players || []).reduce((acc, p) => {
-    if (!p) return acc;
-    const s = p.Serie || "Sin Serie";
-    if (!acc[s]) acc[s] = { total: 0, federados: 0 };
-    acc[s].total += 1;
-    const st = (p.Status_Validacion || "").toString().toUpperCase();
-    if (st === 'FEDERADO' || st === 'APROBADO') {
-      acc[s].federados += 1;
-    }
-    return acc;
-  }, {} as Record<string, { total: number, federados: number }>);
-  
-  const seriesChartData = Object.entries(seriesCount)
-    .sort((a, b) => b[1].total - a[1].total)
-    .map(([name, data]) => ({
-      name,
-      count: data.total,
-      federados: data.federados,
-      percentage: Math.round((data.total / ((players || []).length || 1)) * 100)
-    }));
-
-
-  const filteredPlayers = (players || []).filter(p => {
-    if (!p) return false;
-    const nombre = p.Nombres || p.Nombre || "";
-    const apellido = p.Apellido_Paterno || p.Apellidos || "";
-    const rut = p.RUT || "";
-    
-    const normalize = (str: any) => (str || "").toString().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-    const cleanRut = (r: any) => (r || "").toString().replace(/[\.\-]/g, '').toLowerCase();
-    
-    const fullName = normalize(nombre + " " + apellido);
-    const searchTerm = normalize(search);
-    const isRutMatch = cleanRut(rut).includes(cleanRut(search));
-
-    return (fullName.includes(searchTerm) || isRutMatch);
-  });
-
   return (
-    <div className="flex min-h-screen relative pb-20 md:pb-0">
-      {/* Sidebar */}
-      <aside className="w-64 border-r border-slate-800 p-6 hidden md:block z-10 bg-slate-950">
-        <div className="flex items-center gap-3 mb-10">
-          <img
-            src="/logo.png"
-            alt="Logo Valle Grande FC"
-            className="w-12 h-12 object-contain drop-shadow-md"
-            onError={(e) => {
-              // Fallback visual si la imagen aún no se sube
-              e.currentTarget.style.display = 'none';
-              e.currentTarget.parentElement?.querySelector('.fallback-logo')?.classList.remove('hidden');
-            }}
-          />
-          <div className="fallback-logo hidden w-10 h-10 bg-brand-600 rounded-lg flex items-center justify-center font-bold text-xl shadow-lg shadow-brand-500/20">
-            VG
-          </div>
-          <span className="font-bold text-lg tracking-tight">Valle Grande FC</span>
-        </div>
+    <div className="flex min-h-screen bg-slate-950 text-slate-100">
+      <aside className="w-64 border-r border-slate-800 p-6 hidden md:block">
+        <h1 className="font-bold text-xl mb-10">Valle Grande FC</h1>
+        <nav className="space-y-4">
+          <button onClick={() => setCurrentView('dashboard')} className="flex items-center gap-2">Dashboard</button>
+        </nav>
+      </aside>
 
-<nav className="space-y-1">
-           <NavItem icon={LayoutDashboard} label="Dashboard" active={currentView === 'dashboard'} onClick={() => setCurrentView('dashboard')} />
-           <NavItem icon={Users} label="Jugadores" active={currentView === 'jugadores'} onClick={() => setCurrentView('jugadores')} />
-           <NavItem icon={Clock} label="Validaciones" active={currentView === 'validaciones'} onClick={() => setCurrentView('validaciones')} />
-         </nav>
-        </aside>
-
-      {/* Main Content */}
-      <main className="flex-1 p-4 md:p-10 overflow-y-auto">
-        <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 md:mb-10">
-          <div className="flex justify-between items-start w-full md:w-auto">
-            <div className="flex items-center gap-4">
-              <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
-                {currentView === 'dashboard' ? 'Panel de Control' : currentView === 'jugadores' ? 'Directorio de Jugadores' : 'Gestión de Validaciones'}
-              </h1>
-              <button
-                onClick={fetchData}
-                className="p-2 hover:bg-slate-900 rounded-lg transition-colors text-slate-400 shrink-0"
-                title="Actualizar datos"
-              >
-                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-brand-500' : ''}`} />
-              </button>
-            </div>
-          </div>
-          
-          <p className="text-slate-400 mt-1 hidden md:block">Gestión documental en tiempo real.</p>
-
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
-            {currentView === 'dashboard' && (
-              <div className="relative w-full sm:w-auto">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                <input
-                  type="text"
-                  placeholder="Buscar por RUT o Nombre..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="input-field pl-10 pr-4 py-2 w-full md:w-64 text-sm md:text-base"
-                />
-              </div>
-            )}
-            <div className="flex gap-2 w-full sm:w-auto">
-              <button onClick={() => setIsImportModalOpen(true)} className="flex-1 sm:flex-none px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm font-bold transition-colors flex items-center justify-center gap-2">
-                <Upload className="w-4 h-4" /> Importar
-              </button>
-              <button onClick={() => setIsModalOpen(true)} className="flex-1 sm:flex-none btn-primary py-2 text-sm flex items-center justify-center gap-2">
-                <Plus className="w-4 h-4" />
-                Nuevo
-              </button>
-            </div>
-          </div>
+      <main className="flex-1 p-10">
+        <header className="flex justify-between items-center mb-10">
+          <h1 className="text-3xl font-bold">Panel de Control</h1>
+          <button onClick={() => setIsModalOpen(true)} className="btn-primary px-4 py-2 flex items-center gap-2">
+            <Plus className="w-4 h-4" /> Nuevo Jugador
+          </button>
         </header>
 
-        {currentView === 'dashboard' ? (
-          <>
-            {/* Stats Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-              {stats.map((stat, i) => (
-                <div key={i} className="glass-card p-6 flex items-center gap-4">
-                  <div className={`w-12 h-12 ${stat.bg} rounded-xl flex items-center justify-center`}>
-                    <stat.icon className={`w-6 h-6 ${stat.iconColor || "text-slate-50"}`} />
-                  </div>
-                  <div>
-                    <p className="text-sm text-slate-400">{stat.label}</p>
-                    <p className="text-2xl font-bold">{loading ? "..." : stat.value}</p>
-                  </div>
+        {isModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <div className="glass-card w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6">
+              <h2 className="text-xl font-bold mb-6">Registrar Nuevo Jugador</h2>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <input required name="RUT" value={formData.RUT} onChange={handleInputChange} placeholder="RUT" className="input-field w-full" />
+                <input required name="Nombres" value={formData.Nombres} onChange={handleInputChange} placeholder="Nombres" className="input-field w-full" />
+                <div className="grid grid-cols-2 gap-4">
+                  <input required name="Apellido_Paterno" value={formData.Apellido_Paterno} onChange={handleInputChange} placeholder="Ap. Paterno" className="input-field w-full" />
+                  <input required name="Apellido_Materno" value={formData.Apellido_Materno} onChange={handleInputChange} placeholder="Ap. Materno" className="input-field w-full" />
                 </div>
-              ))}
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              {/* Recent Players Table */}
-              <div className="lg:col-span-2 glass-card overflow-hidden">
-                <div className="p-6 border-b border-slate-800 flex items-center justify-between">
-                  <h2 className="font-semibold text-lg">Directorio Rápido</h2>
-                  <span className="text-brand-500 text-sm font-medium">{filteredPlayers.length} mostrados</span>
+                <input type="date" name="Fecha_Nacimiento" value={formData.Fecha_Nacimiento} onChange={handleInputChange} className="input-field w-full" />
+                <select name="Serie" value={formData.Serie} onChange={handleInputChange} className="input-field w-full">
+                  <option value="">Seleccione Serie...</option>
+                  <option value="1ERA ADULTA">1ERA ADULTA</option>
+                </select>
+                <div className="grid grid-cols-2 gap-4">
+                  <input name="WhatsApp" value={formData.WhatsApp} onChange={handleInputChange} placeholder="WhatsApp" className="input-field w-full" />
+                  <input name="Posicion" value={formData.Posicion} onChange={handleInputChange} placeholder="Posición" className="input-field w-full" />
                 </div>
-                <div className="overflow-x-auto">
-                  {loading && players.length === 0 ? (
-                    <div className="p-20 flex flex-col items-center justify-center gap-4 text-slate-500">
-                      <Loader2 className="w-8 h-8 animate-spin text-brand-500" />
-                      <p>Conectando con Google Sheets...</p>
-                    </div>
-                  ) : players.length === 0 ? (
-                    <div className="p-20 text-center text-slate-500">
-                      <p>No hay jugadores registrados en el Excel.</p>
-                    </div>
-                  ) : (
-                    <table className="w-full text-left">
-                      <thead>
-                        <tr className="text-slate-500 text-sm border-b border-slate-800 bg-slate-900/20">
-                          <th className="px-6 py-4 font-medium">Jugador</th>
-                          <th className="px-6 py-4 font-medium">Serie</th>
-                          <th className="px-6 py-4 font-medium">Estado</th>
-                          <th className="px-6 py-4 font-medium"></th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-800">
-                        {filteredPlayers.map((player, i) => (
-                          <tr key={i} onClick={() => setSelectedPlayer(player)} className="hover:bg-slate-900/50 transition-colors cursor-pointer group">
-                            <td className="px-6 py-4">
-                              <div className="font-medium text-slate-200">{player.Nombres || player.Nombre} {player.Apellido_Paterno || player.Apellidos}</div>
-                              <div className="text-xs text-slate-500 font-mono mt-0.5">{player.RUT}</div>
-                            </td>
-                            <td className="px-6 py-4">
-                              <span className="text-sm text-slate-300 bg-slate-800/50 px-2 py-1 rounded-md border border-slate-700/50 whitespace-nowrap">
-                                {player.Serie}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4">
-                              <span className={`px-3 py-1 rounded-full text-xs font-medium border whitespace-nowrap inline-flex items-center gap-1 ${
-                                  player.Status_Validacion?.toUpperCase() === 'FEDERADO' || player.Status_Validacion?.toUpperCase() === 'APROBADO' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-                                  player.Status_Validacion?.toUpperCase() === 'POR FEDERAR' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
-                                  'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                                }`}>
-                                {(player.Status_Validacion || 'PENDIENTE').toUpperCase()}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 text-right">
-                              <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-brand-400 transition-colors ml-auto" />
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-              </div>
-
-              {/* Métricas por Serie (Gráfica) */}
-              <div className="glass-card p-6 h-fit flex flex-col max-h-[500px]">
-                <h2 className="font-semibold text-lg mb-6 flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5 text-brand-500" />
-                  Distribución por Serie
-                </h2>
+                <input name="Direccion" value={formData.Direccion} onChange={handleInputChange} placeholder="Dirección" className="input-field w-full" />
                 
-                {seriesChartData.length === 0 ? (
-                  <p className="text-sm text-slate-500 text-center py-10">No hay datos disponibles.</p>
-                ) : (
-                  <div className="space-y-5 overflow-y-auto pr-2 custom-scrollbar">
-                    {seriesChartData.map((serie, i) => (
-                      <div key={i} className="group">
-                        <div className="flex justify-between text-sm mb-1.5">
-                          <span className="font-medium text-slate-300 group-hover:text-brand-400 transition-colors">{serie.name}</span>
-                          <span className="text-slate-400 font-mono text-xs">{serie.count} Jug. <span className="text-emerald-400">({serie.federados} Fed.)</span></span>
-                        </div>
-                        <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden flex">
-                          <div 
-                            className="h-full bg-gradient-to-r from-brand-600 to-brand-400 rounded-full relative overflow-hidden" 
-                            style={{ width: `${serie.percentage}%` }}
-                          >
-                            <div className="absolute inset-0 bg-white/20 w-full h-full animate-[shimmer_2s_infinite] -translate-x-full"></div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+                <div className="pt-4 border-t border-slate-800 space-y-2">
+                  <label className="text-xs text-slate-400">Cédula Frontal</label>
+                  <input type="file" onChange={(e) => e.target.files && setRegistrationFiles({...registrationFiles, frontal: e.target.files[0]})} className="w-full" />
+                  <label className="text-xs text-slate-400">Cédula Reverso</label>
+                  <input type="file" onChange={(e) => e.target.files && setRegistrationFiles({...registrationFiles, reverso: e.target.files[0]})} className="w-full" />
+                  <label className="text-xs text-slate-400">Antecedentes</label>
+                  <input type="file" onChange={(e) => e.target.files && setRegistrationFiles({...registrationFiles, antecedentes: e.target.files[0]})} className="w-full" />
+                </div>
+
+                <div className="flex justify-end gap-3 mt-6">
+                  <button type="button" onClick={() => setIsModalOpen(false)} className="text-sm">Cancelar</button>
+                  <button type="submit" disabled={isSubmitting} className="btn-primary px-4 py-2 text-sm">Guardar</button>
+                </div>
+              </form>
             </div>
-          </>
-        ) : currentView === 'jugadores' ? (
-          <JugadoresView players={players} onSelectPlayer={setSelectedPlayer} />
-        ) : (
-          <ValidacionesView players={players} onSelectPlayer={setSelectedPlayer} />
+          </div>
         )}
       </main>
-
-      {/* Mobile Bottom Navigation */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-950/90 backdrop-blur-md border-t border-slate-800 flex justify-around items-center p-3 z-40 px-6">
-        <button onClick={() => setCurrentView('dashboard')} className={`flex flex-col items-center gap-1 transition-colors ${currentView === 'dashboard' ? 'text-brand-500' : 'text-slate-500'}`}>
-          <LayoutDashboard className="w-5 h-5" />
-          <span className="text-[10px] font-medium">Panel</span>
-        </button>
-        <button onClick={() => setCurrentView('jugadores')} className={`flex flex-col items-center gap-1 transition-colors ${currentView === 'jugadores' ? 'text-brand-500' : 'text-slate-500'}`}>
-          <Users className="w-5 h-5" />
-          <span className="text-[10px] font-medium">Jugadores</span>
-        </button>
-        <button onClick={() => setCurrentView('validaciones')} className={`flex flex-col items-center gap-1 transition-colors ${currentView === 'validaciones' ? 'text-brand-500' : 'text-slate-500'}`}>
-          <Clock className="w-5 h-5" />
-          <span className="text-[10px] font-medium">Validar</span>
-        </button>
-      </nav>
-
-      {/* Modal Importar */}
-      {isImportModalOpen && <ImportModal onClose={() => setIsImportModalOpen(false)} onRefresh={fetchData} />}
-
-      {/* Modal de Registro */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="glass-card w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl shadow-black">
-            <div className="sticky top-0 bg-slate-900/90 backdrop-blur-md p-6 border-b border-slate-800 flex items-center justify-between z-10">
-              <h2 className="text-xl font-bold text-white">Registrar Nuevo Jugador</h2>
-              <button
-                onClick={() => setIsModalOpen(false)}
-                className="p-2 hover:bg-slate-800 rounded-full transition-colors text-slate-400 hover:text-white"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="p-6 space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Datos Personales */}
-                <div className="space-y-4">
-                  <h3 className="text-sm font-bold text-brand-400 uppercase tracking-wider mb-4 border-b border-slate-800 pb-2">Datos Personales</h3>
-
-                  <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1">RUT *</label>
-                    <input required name="RUT" value={formData.RUT} onChange={handleInputChange} type="text" placeholder="12.345.678-9" className="input-field w-full text-sm" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1">Nombres *</label>
-                    <input required name="Nombres" value={formData.Nombres} onChange={handleInputChange} type="text" className="input-field w-full text-sm" />
-                  </div>
-                  <div className="flex gap-4">
-                    <div className="flex-1">
-                      <label className="block text-xs font-medium text-slate-400 mb-1">Ap. Paterno *</label>
-                      <input required name="Apellido_Paterno" value={formData.Apellido_Paterno} onChange={handleInputChange} type="text" className="input-field w-full text-sm" />
-                    </div>
-                    <div className="flex-1">
-                      <label className="block text-xs font-medium text-slate-400 mb-1">Ap. Materno</label>
-                      <input name="Apellido_Materno" value={formData.Apellido_Materno} onChange={handleInputChange} type="text" className="input-field w-full text-sm" />
-                    </div>
-                  </div>
-                  <div className="flex gap-4">
-                    <div className="flex-1">
-                      <label className="block text-xs font-medium text-slate-400 mb-1">Nacimiento *</label>
-                      <input required name="Fecha_Nacimiento" value={formData.Fecha_Nacimiento} onChange={handleInputChange} type="date" className="input-field w-full text-sm" />
-                    </div>
-                    <div className="flex-1">
-                      <label className="block text-xs font-medium text-slate-400 mb-1">Nacionalidad</label>
-                      <select name="Nacionalidad" value={formData.Nacionalidad} onChange={handleInputChange} className="input-field w-full text-sm appearance-none">
-                        <option value="Chile">Chile</option>
-                        <option value="Argentina">Argentina</option>
-                        <option value="Bolivia">Bolivia</option>
-                        <option value="Brasil">Brasil</option>
-                        <option value="Colombia">Colombia</option>
-                        <option value="Ecuador">Ecuador</option>
-                        <option value="Paraguay">Paraguay</option>
-                        <option value="Perú">Perú</option>
-                        <option value="Uruguay">Uruguay</option>
-                        <option value="Venezuela">Venezuela</option>
-                        <option disabled>──────────</option>
-                        <option value="México">México</option>
-                        <option value="Estados Unidos">Estados Unidos</option>
-                        <option value="Canadá">Canadá</option>
-                        <option value="Costa Rica">Costa Rica</option>
-                        <option value="Cuba">Cuba</option>
-                        <option value="El Salvador">El Salvador</option>
-                        <option value="Guatemala">Guatemala</option>
-                        <option value="Honduras">Honduras</option>
-                        <option value="Nicaragua">Nicaragua</option>
-                        <option value="Panamá">Panamá</option>
-                        <option value="Puerto Rico">Puerto Rico</option>
-                        <option value="República Dominicana">República Dominicana</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Club & Contacto */}
-                <div className="space-y-4">
-                  <h3 className="text-sm font-bold text-brand-400 uppercase tracking-wider mb-4 border-b border-slate-800 pb-2">Club & Contacto</h3>
-
-                  <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1">Serie *</label>
-                    <select required name="Serie" value={formData.Serie} onChange={handleInputChange} className="input-field w-full text-sm appearance-none">
-                      <option value="">Selecciona una serie...</option>
-                      <option value="1ERA INFANTIL">1ERA INFANTIL</option>
-                      <option value="2DA INFANTIL">2DA INFANTIL</option>
-                      <option value="3RA INFANTIL">3RA INFANTIL</option>
-                      <option value="4TA INFANTIL">4TA INFANTIL</option>
-                      <option value="JUVENIL">JUVENIL</option>
-                      <option value="3RA ADULTA">3RA ADULTA</option>
-                      <option value="2DA ADULTA">2DA ADULTA</option>
-                      <option value="1ERA ADULTA">1ERA ADULTA</option>
-                      <option value="SENIOR">SENIOR</option>
-                      <option value="SUPER SENIOR">SUPER SENIOR</option>
-                      <option value="DORADOS">DORADOS</option>
-                      <option value="FEMENINA INFANTIL">FEMENINA INFANTIL</option>
-                      <option value="FEMENINA ADULTA">FEMENINA ADULTA</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1">Posición</label>
-                    <select name="Posicion" value={formData.Posicion} onChange={handleInputChange} className="input-field w-full text-sm appearance-none">
-                      <option value="">Selecciona posición...</option>
-                      <option value="Portero">Portero</option>
-                      <option value="Defensa">Defensa</option>
-                      <option value="Mediocampista">Mediocampista</option>
-                      <option value="Delantero">Delantero</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1">WhatsApp</label>
-                    <input name="WhatsApp" value={formData.WhatsApp} onChange={handleInputChange} type="text" placeholder="+56912345678" className="input-field w-full text-sm" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1">Dirección</label>
-                    <input name="Direccion" value={formData.Direccion} onChange={handleInputChange} type="text" className="input-field w-full text-sm" />
-                  </div>
-                </div>
-
-                {/* Documentación en Registro */}
-                <div className="space-y-4">
-                  <h3 className="text-sm font-bold text-brand-400 uppercase tracking-wider mb-4 border-b border-slate-800 pb-2">Documentación Obligatoria</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="space-y-1">
-                      <label className="text-[10px] text-slate-500 uppercase">Cédula Frontal</label>
-                      <input type="file" accept="image/*" onChange={(e) => e.target.files && setRegistrationFiles({...registrationFiles, frontal: e.target.files[0]})} className="input-field w-full text-xs" />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] text-slate-500 uppercase">Cédula Reverso</label>
-                      <input type="file" accept="image/*" onChange={(e) => e.target.files && setRegistrationFiles({...registrationFiles, reverso: e.target.files[0]})} className="input-field w-full text-xs" />
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] text-slate-500 uppercase">Antecedentes</label>
