@@ -91,16 +91,22 @@ export default function RegistroPublico() {
     });
   };
 
-  const uploadToCloudinary = async (base64: string) => {
-    const res = await fetch(`https://api.cloudinary.com/v1_1/dppv8v6bt/image/upload`, {
+  const uploadToCloudinary = async (fileData: string) => {
+    const formData = new FormData();
+    formData.append('file', fileData);
+    formData.append('upload_preset', 'vallegrande_docs');
+    formData.append('resource_type', 'auto');
+
+    const res = await fetch(`https://api.cloudinary.com/v1_1/dppv8v6bt/auto/upload`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        file: base64,
-        upload_preset: "vallegrande_docs",
-      })
+      body: formData
     });
+    
     const data = await res.json();
+    if (!res.ok) {
+      console.error(`Cloudinary Error:`, data);
+      throw new Error(data.error?.message || `Error al subir a la nube`);
+    }
     return data.secure_url;
   };
 
@@ -108,10 +114,7 @@ export default function RegistroPublico() {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
-      reader.onload = () => {
-        const base64 = (reader.result as string).split(',')[1];
-        resolve(base64);
-      };
+      reader.onload = () => resolve(reader.result as string);
       reader.onerror = (e) => reject(e);
     });
   };
@@ -235,9 +238,6 @@ export default function RegistroPublico() {
                   <label className="text-[10px] text-slate-500 uppercase ml-1">Fecha de Nacimiento</label>
                   <input required type="date" name="Fecha_Nacimiento" value={formData.Fecha_Nacimiento} onChange={handleInputChange} className="input-field w-full text-base" />
                 </div>
-                <input name="WhatsApp" value={formData.WhatsApp} onChange={handleInputChange} placeholder="WhatsApp (+569...)" className="input-field w-full text-base" />
-                <input name="Direccion" value={formData.Direccion} onChange={handleInputChange} placeholder="Dirección" className="input-field w-full text-base md:col-span-2" />
-                <input name="Posicion" value={formData.Posicion} onChange={handleInputChange} placeholder="Posición (Ej: Defensa)" className="input-field w-full text-base" />
                 <div className="space-y-1">
                    <label className="text-[10px] text-slate-500 uppercase ml-1">Serie</label>
                   <select required name="Serie" value={formData.Serie} onChange={handleInputChange} className="input-field w-full text-base">
@@ -248,9 +248,12 @@ export default function RegistroPublico() {
                       "DORADOS", "FEMENINA INFANTIL", "FEMENINA ADULTA"
                     ]
                     .filter(s => {
-                      if (!formData.Fecha_Nacimiento) return true;
-                      if (isMinor) return s.includes("INFANTIL") || s.includes("JUVENIL");
-                      return s.includes("ADULTA") || s.includes("SENIOR") || s.includes("DORADOS");
+                      if (!formData.Fecha_Nacimiento) return true; // Mostrar todas si no hay fecha aún
+                      if (isMinor) {
+                        return s.includes("INFANTIL") || s.includes("JUVENIL");
+                      } else {
+                        return s.includes("ADULTA") || s.includes("SENIOR") || s.includes("DORADOS");
+                      }
                     })
                     .map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
