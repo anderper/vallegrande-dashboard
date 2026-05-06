@@ -28,8 +28,7 @@ import {
   Image as ImageIcon,
   Download,
   Filter,
-  Upload,
-  Trash2
+  Upload
 } from "lucide-react";
 
 interface Player {
@@ -250,32 +249,6 @@ export default function Dashboard() {
     } catch (error) {
       console.error(error);
       alert("Error al enviar los archivos.");
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  const handleDeletePlayer = async () => {
-    if (!selectedPlayer) return;
-    if (!confirm(`¿Estás seguro de eliminar permanentemente a ${selectedPlayer.Nombres || selectedPlayer.Nombre}? Esta acción no se puede deshacer.`)) return;
-    
-    setIsUploading(true);
-    try {
-      const res = await fetch('/api/players', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: "DELETE", RUT: selectedPlayer.RUT })
-      });
-      const result = await res.json();
-      if (result.success) {
-        alert("Jugador eliminado correctamente.");
-        setSelectedPlayer(null);
-        fetchData();
-      } else {
-        alert("Error al eliminar: " + result.error);
-      }
-    } catch (error) {
-      alert("Error de conexión al eliminar.");
     } finally {
       setIsUploading(false);
     }
@@ -801,30 +774,21 @@ export default function Dashboard() {
             </div>
 
             {/* Acciones */}
-            <div className="p-6 border-t border-slate-800 bg-slate-900/50 flex justify-between items-center gap-3">
-              <button 
-                onClick={handleDeletePlayer}
-                disabled={isUploading}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-rose-500 hover:bg-rose-500/10 rounded-lg transition-colors disabled:opacity-50"
-              >
-                <Trash2 className="w-4 h-4" /> Eliminar Jugador
+            <div className="p-6 border-t border-slate-800 bg-slate-900/50 flex justify-end gap-3">
+              <button onClick={() => {setSelectedPlayer(null); setSelectedFiles({});}} className="px-6 py-2 text-sm font-medium text-slate-300 hover:text-white transition-colors">
+                Cerrar
               </button>
-              <div className="flex gap-3">
-                <button onClick={() => {setSelectedPlayer(null); setSelectedFiles({});}} className="px-6 py-2 text-sm font-medium text-slate-300 hover:text-white transition-colors">
-                  Cerrar
-                </button>
-                <button 
-                  onClick={() => handleUpdatePlayerDocs()}
-                  disabled={isUploading || Object.keys(selectedFiles).length === 0} 
-                  className="btn-primary py-2 px-6 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isUploading ? (
-                    <><Loader2 className="w-4 h-4 animate-spin" /> Guardando en Drive...</>
-                  ) : (
-                    <><Save className="w-4 h-4" /> Guardar Archivos ({Object.keys(selectedFiles).length})</>
-                  )}
-                </button>
-              </div>
+              <button 
+                onClick={() => handleUpdatePlayerDocs()}
+                disabled={isUploading || Object.keys(selectedFiles).length === 0} 
+                className="btn-primary py-2 px-6 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isUploading ? (
+                  <><Loader2 className="w-4 h-4 animate-spin" /> Guardando en Drive...</>
+                ) : (
+                  <><Save className="w-4 h-4" /> Guardar Archivos ({Object.keys(selectedFiles).length})</>
+                )}
+              </button>
             </div>
           </div>
         </div>
