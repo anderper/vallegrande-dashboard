@@ -91,16 +91,21 @@ export default function RegistroPublico() {
     });
   };
 
-  const uploadToCloudinary = async (base64: string) => {
+  const uploadToCloudinary = async (fileData: string) => {
+    const formData = new FormData();
+    formData.append('file', fileData);
+    formData.append('upload_preset', 'vallegrande_docs');
+
     const res = await fetch(`https://api.cloudinary.com/v1_1/dppv8v6bt/image/upload`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        file: base64,
-        upload_preset: "vallegrande_docs",
-      })
+      body: formData
     });
+    
     const data = await res.json();
+    if (!res.ok) {
+      console.error("Cloudinary Error Details:", data);
+      throw new Error(data.error?.message || "Error al subir a la nube");
+    }
     return data.secure_url;
   };
 

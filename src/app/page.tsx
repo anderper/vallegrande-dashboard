@@ -200,8 +200,7 @@ export default function Dashboard() {
           ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
           // Comprimir a JPEG con calidad 70%
           const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
-          const base64 = dataUrl.split(',')[1];
-          resolve(base64);
+          resolve(dataUrl);
         };
         img.onerror = (e) => reject(e);
       };
@@ -218,17 +217,21 @@ export default function Dashboard() {
     });
   };
 
-  const uploadToCloudinary = async (base64: string) => {
+  const uploadToCloudinary = async (fileData: string) => {
+    const formData = new FormData();
+    formData.append('file', fileData);
+    formData.append('upload_preset', 'vallegrande_docs');
+
     const res = await fetch(`https://api.cloudinary.com/v1_1/dppv8v6bt/image/upload`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        file: base64,
-        upload_preset: "vallegrande_docs",
-      })
+      body: formData
     });
+    
     const data = await res.json();
-    if (!data.secure_url) throw new Error("Error al subir a la nube");
+    if (!res.ok) {
+      console.error("Cloudinary Error Details:", data);
+      throw new Error(data.error?.message || "Error al subir a la nube");
+    }
     return data.secure_url;
   };
 
