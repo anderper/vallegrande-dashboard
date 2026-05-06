@@ -19,6 +19,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
+    console.log("DEBUG: Enviando a Google Apps Script:", JSON.stringify(body, null, 2));
 
     const response = await fetch(SCRIPT_URL || '', {
       method: 'POST',
