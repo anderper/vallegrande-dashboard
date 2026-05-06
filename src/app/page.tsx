@@ -76,12 +76,23 @@ export default function Dashboard() {
     try {
       // Agregamos un timestamp para que el navegador nunca use datos cacheados
       const res = await fetch(`/api/players?t=${new Date().getTime()}`, { cache: 'no-store' });
+      
+      if (!res.ok) {
+        throw new Error(`Error del servidor: ${res.status}`);
+      }
+
       const data = await res.json();
-      if (Array.isArray(data)) {
+      
+      if (data && Array.isArray(data)) {
         setPlayers(data);
+      } else {
+        console.error("Los datos recibidos no son un array:", data);
+        setPlayers([]);
       }
     } catch (error) {
-      console.error("Error fetching data:", error);
+      console.error("Error detallado al conectar con Google Sheets:", error);
+      // No dejamos que el error rompa la ejecución, simplemente mostramos lista vacía
+      setPlayers([]);
     } finally {
       setLoading(false);
     }
