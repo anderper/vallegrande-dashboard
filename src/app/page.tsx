@@ -150,6 +150,8 @@ export default function Dashboard() {
         Status_Validacion: (docPayload.Foto_Cedula_Frontal && docPayload.Foto_Cedula_Reverso && docPayload.Antecedentes_PDF) ? "POR FEDERAR" : "Pendiente"
       };
 
+      console.log("DEBUG: Enviando payload CREACIÓN desde Dashboard:", payload);
+
       const res = await fetch('/api/players', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -267,6 +269,8 @@ export default function Dashboard() {
       if (finalStatus !== selectedPlayer.Status_Validacion) {
         payload.newStatus = finalStatus;
       }
+
+      console.log("DEBUG: Enviando payload ACTUALIZACIÓN desde Dashboard:", payload);
 
       const res = await fetch('/api/players', {
         method: 'POST',

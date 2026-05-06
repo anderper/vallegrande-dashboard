@@ -169,6 +169,8 @@ export default function RegistroPublico() {
         Status_Validacion: "POR FEDERAR"
       };
 
+      console.log("DEBUG: Enviando payload desde Portal REGISTRO:", payload);
+
       const res = await fetch('/api/players', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
