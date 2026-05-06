@@ -70,26 +70,42 @@ export default function RegistroPublico() {
   };
 
 
-  // Sube un archivo directamente a Cloudinary usando el File nativo
-  const uploadFile = async (file: File): Promise<string> => {
-    const fd = new FormData();
-    // Para PDFs usamos el endpoint raw, para imágenes el de image
-    const isPdf = file.type === 'application/pdf';
-    fd.append('file', file);
-    fd.append('upload_preset', 'vallegrande_docs');
 
-    const endpoint = isPdf
-      ? `https://api.cloudinary.com/v1_1/dppv8v6bt/raw/upload`
-      : `https://api.cloudinary.com/v1_1/dppv8v6bt/image/upload`;
-
-    const res = await fetch(endpoint, { method: 'POST', body: fd });
-    const data = await res.json();
-    if (!res.ok) {
-      console.error('Cloudinary Error:', data);
-      throw new Error(data?.error?.message || 'Error al subir archivo');
-    }
-    return data.secure_url;
+  const getBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => {
+        const base64 = (reader.result as string).split(',')[1];
+        resolve(base64);
+      };
+      reader.onerror = (e) => reject(e);
+    });
   };
+
+  // Sube un archivo directamente a Google Drive vía Apps Script
+  const uploadFile = async (file: File): Promise<string> => {
+    const base64 = await getBase64(file);
+    
+    const res = await fetch('/api/players', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: "UPLOAD_FILE",
+        fileData: base64,
+        fileName: file.name,
+        mimeType: file.type
+      })
+    });
+    
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      console.error('Upload Error:', data);
+      throw new Error(data?.error || 'Error al subir archivo a Drive');
+    }
+    return data.url;
+  };
+
 
   // Comprime una imagen y devuelve un Blob/File listo para subir
   const compressImageToFile = (file: File): Promise<File> => {
