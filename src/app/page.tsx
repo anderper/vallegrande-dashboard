@@ -200,7 +200,8 @@ export default function Dashboard() {
           ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
           // Comprimir a JPEG con calidad 70%
           const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
-          resolve(dataUrl);
+          const base64 = dataUrl.split(',')[1];
+          resolve(base64);
         };
         img.onerror = (e) => reject(e);
       };
@@ -212,26 +213,27 @@ export default function Dashboard() {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result as string);
+      reader.onload = () => {
+        const base64 = (reader.result as string).split(',')[1];
+        resolve(base64);
+      };
       reader.onerror = (e) => reject(e);
     });
   };
 
-  const uploadToCloudinary = async (fileData: string) => {
-    const formData = new FormData();
-    formData.append('file', fileData);
-    formData.append('upload_preset', 'vallegrande_docs');
-    formData.append('resource_type', 'auto');
-
-    const res = await fetch(`https://api.cloudinary.com/v1_1/dppv8v6bt/upload`, {
+  const uploadToCloudinary = async (base64: string) => {
+    const res = await fetch(`https://api.cloudinary.com/v1_1/dppv8v6bt/image/upload`, {
       method: 'POST',
-      body: formData
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        file: base64,
+        upload_preset: "vallegrande_docs",
+      })
     });
-    
     const data = await res.json();
-    if (!res.ok) {
-      console.error(`Cloudinary Error:`, data);
-      throw new Error(data.error?.message || `Error al subir a la nube`);
+    if (!data.secure_url) {
+      console.error("Cloudinary Error:", data);
+      throw new Error("Error al subir a la nube");
     }
     return data.secure_url;
   };
