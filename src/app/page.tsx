@@ -163,12 +163,23 @@ export default function Dashboard() {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
-      reader.onload = () => {
-        const base64 = (reader.result as string).split(',')[1];
-        resolve(base64);
-      };
+      reader.onload = () => resolve(reader.result as string);
       reader.onerror = (e) => reject(e);
     });
+  };
+
+  const uploadToCloudinary = async (base64: string) => {
+    const res = await fetch(`https://api.cloudinary.com/v1_1/dppv8v6bt/image/upload`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        file: base64,
+        upload_preset: "vallegrande_docs",
+      })
+    });
+    const data = await res.json();
+    if (!data.secure_url) throw new Error("Error al subir a la nube");
+    return data.secure_url;
   };
 
   const handleUpdatePlayerDocs = async (newStatus?: string) => {
@@ -182,19 +193,19 @@ export default function Dashboard() {
       };
 
       if (selectedFiles.frontal) {
-        payload.fileFrontal = { base64: await compressImage(selectedFiles.frontal), mimeType: 'image/jpeg' };
+        payload.Foto_Cedula_Frontal = await uploadToCloudinary(await compressImage(selectedFiles.frontal));
       }
       if (selectedFiles.reverso) {
-        payload.fileReverso = { base64: await compressImage(selectedFiles.reverso), mimeType: 'image/jpeg' };
+        payload.Foto_Cedula_Reverso = await uploadToCloudinary(await compressImage(selectedFiles.reverso));
       }
       if (selectedFiles.antecedentes) {
-        payload.fileAntecedentes = { base64: await getBase64(selectedFiles.antecedentes), mimeType: 'application/pdf' };
+        payload.Antecedentes_PDF = await uploadToCloudinary(await getBase64(selectedFiles.antecedentes));
       }
 
       // Evaluar Auto-Status
-      const hasFrontal = payload.fileFrontal || selectedPlayer.Foto_Cedula_Frontal;
-      const hasReverso = payload.fileReverso || selectedPlayer.Foto_Cedula_Reverso;
-      const hasAntecedentes = payload.fileAntecedentes || selectedPlayer.Antecedentes_PDF;
+      const hasFrontal = payload.Foto_Cedula_Frontal || selectedPlayer.Foto_Cedula_Frontal;
+      const hasReverso = payload.Foto_Cedula_Reverso || selectedPlayer.Foto_Cedula_Reverso;
+      const hasAntecedentes = payload.Antecedentes_PDF || selectedPlayer.Antecedentes_PDF;
       
       let finalStatus = newStatus || selectedPlayer.Status_Validacion;
       
