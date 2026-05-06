@@ -866,9 +866,30 @@ function JugadoresView({ players, onSelectPlayer }: { players: Player[], onSelec
                           {p.Status_Validacion || 'Pendiente'}
                         </span>
                       </div>
-                      <div className="pt-3 border-t border-slate-800/50 flex gap-4 text-xs text-slate-400">
-                        {p.Posicion && <div><span className="text-slate-500">Pos:</span> {p.Posicion}</div>}
-                        {p.Edad && <div><span className="text-slate-500">Edad:</span> {p.Edad}</div>}
+                      <div className="pt-3 border-t border-slate-800/50 flex flex-wrap items-center justify-between gap-y-2">
+                        <div className="flex gap-4 text-xs text-slate-400">
+                          {p.Posicion && <div><span className="text-slate-500">Pos:</span> {p.Posicion}</div>}
+                          {p.Edad && <div><span className="text-slate-500">Edad:</span> {p.Edad}</div>}
+                        </div>
+                        <div className="flex gap-1.5">
+                          <div title="Cédula Frontal" className={`w-6 h-6 rounded flex items-center justify-center border ${p.Foto_Cedula_Frontal ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-slate-800/50 border-slate-700/50 text-slate-600'}`}>
+                            <ImageIcon className="w-3.5 h-3.5" />
+                          </div>
+                          <div title="Cédula Reverso" className={`w-6 h-6 rounded flex items-center justify-center border ${p.Foto_Cedula_Reverso ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-slate-800/50 border-slate-700/50 text-slate-600'}`}>
+                            <div className="relative">
+                              <ImageIcon className="w-3.5 h-3.5" />
+                              <div className="absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 bg-current rounded-full border border-slate-900" />
+                            </div>
+                          </div>
+                          <div title="Antecedentes" className={`w-6 h-6 rounded flex items-center justify-center border ${p.Antecedentes_PDF ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-slate-800/50 border-slate-700/50 text-slate-600'}`}>
+                            <FileText className="w-3.5 h-3.5" />
+                          </div>
+                          {(p.Foto_Cedula_Padre_Frontal || p.Foto_Cedula_Padre_Reverso) && (
+                            <div title="Doc. Apoderado" className={`w-6 h-6 rounded flex items-center justify-center border ${p.Foto_Cedula_Padre_Frontal && p.Foto_Cedula_Padre_Reverso ? 'bg-blue-500/10 border-blue-500/30 text-blue-400' : 'bg-slate-800/50 border-slate-700/50 text-slate-600'}`}>
+                              <ShieldCheck className="w-3.5 h-3.5" />
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))}
