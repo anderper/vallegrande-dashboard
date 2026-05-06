@@ -28,7 +28,8 @@ import {
   Image as ImageIcon,
   Download,
   Filter,
-  Upload
+  Upload,
+  UserPlus
 } from "lucide-react";
 
 interface Player {
@@ -57,6 +58,7 @@ export default function Dashboard() {
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<{frontal?: File, reverso?: File, antecedentes?: File}>({});
+  const [registrationFiles, setRegistrationFiles] = useState<{frontal?: File, reverso?: File, antecedentes?: File, frontalApoderado?: File, reversoApoderado?: File}>({});
   const [formData, setFormData] = useState({
     RUT: "",
     Nombres: "",
@@ -110,8 +112,44 @@ export default function Dashboard() {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      // Indicamos que es un registro nuevo
-      const payload = { ...formData, action: "CREATE" };
+      // 1. Detectar si es menor de edad
+      const today = new Date();
+      const birthDate = new Date(formData.Fecha_Nacimiento);
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const m = today.getMonth() - birthDate.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
+      const isMinor = age < 18;
+
+      // 2. Subir archivos a Cloudinary si existen
+      const docPayload: any = {};
+      
+      if (registrationFiles.frontal) {
+        docPayload.Foto_Cedula_Frontal = await uploadToCloudinary(await compressImage(registrationFiles.frontal));
+      }
+      if (registrationFiles.reverso) {
+        docPayload.Foto_Cedula_Reverso = await uploadToCloudinary(await compressImage(registrationFiles.reverso));
+      }
+      if (registrationFiles.antecedentes) {
+        docPayload.Antecedentes_PDF = await uploadToCloudinary(await getBase64(registrationFiles.antecedentes));
+      }
+
+      // Si es menor y hay documentos de apoderado, los metemos en observaciones o campos extra
+      let obs = formData.Observaciones;
+      if (isMinor && registrationFiles.frontalApoderado && registrationFiles.reversoApoderado) {
+        const apFrontal = await uploadToCloudinary(await compressImage(registrationFiles.frontalApoderado));
+        const apReverso = await uploadToCloudinary(await compressImage(registrationFiles.reversoApoderado));
+        obs = `${obs} | APODERADO OK | Doc Apoderado: ${apFrontal} , ${apReverso}`;
+      }
+
+      // 3. Crear el jugador con los links de Cloudinary
+      const payload = { 
+        ...formData, 
+        ...docPayload,
+        Observaciones: obs,
+        action: "CREATE",
+        Status_Validacion: (docPayload.Foto_Cedula_Frontal && docPayload.Foto_Cedula_Reverso && docPayload.Antecedentes_PDF) ? "POR FEDERAR" : "Pendiente"
+      };
+
       const res = await fetch('/api/players', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -121,13 +159,12 @@ export default function Dashboard() {
       const result = await res.json();
       if (result.success) {
         setIsModalOpen(false);
-        // Limpiar formulario
         setFormData({
           RUT: "", Nombres: "", Apellido_Paterno: "", Apellido_Materno: "",
-          Fecha_Nacimiento: "", Nacionalidad: "Chilena", Serie: "",
+          Fecha_Nacimiento: "", Nacionalidad: "Chile", Serie: "",
           WhatsApp: "", Direccion: "", Posicion: "", Observaciones: ""
         });
-        // Refrescar la tabla para ver el nuevo jugador
+        setRegistrationFiles({});
         fetchData();
       } else {
         alert("Hubo un error al guardar: " + result.error);
@@ -622,6 +659,56 @@ export default function Dashboard() {
                     <label className="block text-xs font-medium text-slate-400 mb-1">Dirección</label>
                     <input name="Direccion" value={formData.Direccion} onChange={handleInputChange} type="text" className="input-field w-full text-sm" />
                   </div>
+                </div>
+
+                {/* Documentación en Registro */}
+                <div className="space-y-4">
+                  <h3 className="text-sm font-bold text-brand-400 uppercase tracking-wider mb-4 border-b border-slate-800 pb-2">Documentación Obligatoria</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-slate-500 uppercase">Cédula Frontal</label>
+                      <input type="file" accept="image/*" onChange={(e) => e.target.files && setRegistrationFiles({...registrationFiles, frontal: e.target.files[0]})} className="input-field w-full text-xs" />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-slate-500 uppercase">Cédula Reverso</label>
+                      <input type="file" accept="image/*" onChange={(e) => e.target.files && setRegistrationFiles({...registrationFiles, reverso: e.target.files[0]})} className="input-field w-full text-xs" />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-slate-500 uppercase">Antecedentes</label>
+                      <input type="file" accept="application/pdf" onChange={(e) => e.target.files && setRegistrationFiles({...registrationFiles, antecedentes: e.target.files[0]})} className="input-field w-full text-xs" />
+                    </div>
+                  </div>
+                  
+                  {/* Si es menor de edad, mostrar campos para apoderado */}
+                  {(() => {
+                    if (!formData.Fecha_Nacimiento) return null;
+                    const today = new Date();
+                    const birthDate = new Date(formData.Fecha_Nacimiento);
+                    let age = today.getFullYear() - birthDate.getFullYear();
+                    const m = today.getMonth() - birthDate.getMonth();
+                    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
+                    
+                    if (age < 18) {
+                      return (
+                        <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl space-y-4">
+                          <p className="text-xs text-blue-300 font-bold flex items-center gap-2">
+                            <ShieldCheck className="w-4 h-4" /> REQUERIDO: Documentos del Apoderado
+                          </p>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                              <label className="text-[10px] text-slate-500 uppercase">Apoderado Frontal</label>
+                              <input type="file" accept="image/*" onChange={(e) => e.target.files && setRegistrationFiles({...registrationFiles, frontalApoderado: e.target.files[0]})} className="input-field w-full text-xs" />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[10px] text-slate-500 uppercase">Apoderado Reverso</label>
+                              <input type="file" accept="image/*" onChange={(e) => e.target.files && setRegistrationFiles({...registrationFiles, reversoApoderado: e.target.files[0]})} className="input-field w-full text-xs" />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
               </div>
 
