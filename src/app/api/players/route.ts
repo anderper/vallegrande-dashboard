@@ -8,8 +8,10 @@ export async function GET() {
   try {
     const response = await fetch(SCRIPT_URL || 'https://httpbin.org/json', { cache: 'no-store' });
     const data = await response.json();
+    console.log("Datos de Google Sheets:", Array.isArray(data) ? `Array de ${data.length} items` : typeof data);
     return NextResponse.json(data);
   } catch (error: any) {
+    console.error("Error en API Route:", error);
     return NextResponse.json([], { status: 200 });
   }
 }
