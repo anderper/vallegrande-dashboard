@@ -258,6 +258,18 @@ export default function RegistroPublico() {
                     .map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
+                <input name="WhatsApp" value={formData.WhatsApp} onChange={handleInputChange} placeholder="WhatsApp (ej. +569...)" className="input-field w-full text-base" />
+                <input name="Direccion" value={formData.Direccion} onChange={handleInputChange} placeholder="Dirección Completa" className="input-field w-full text-base" />
+                <div className="space-y-1 md:col-span-2">
+                   <label className="text-[10px] text-slate-500 uppercase ml-1">Posición</label>
+                  <select name="Posicion" value={formData.Posicion} onChange={handleInputChange} className="input-field w-full text-base">
+                    <option value="">Selecciona posición...</option>
+                    <option value="Portero">Portero</option>
+                    <option value="Defensa">Defensa</option>
+                    <option value="Mediocampista">Mediocampista</option>
+                    <option value="Delantero">Delantero</option>
+                  </select>
+                </div>
               </div>
             </div>
 
