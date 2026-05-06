@@ -122,24 +122,26 @@ export default function Dashboard() {
 
       // 2. Subir archivos a Cloudinary si existen
       const docPayload: any = {};
+      const rut = formData.RUT.trim() || 'SIN_RUT';
       
       if (registrationFiles.frontal) {
-        docPayload.Foto_Cedula_Frontal = await uploadFile(await compressImageToFile(registrationFiles.frontal));
+        docPayload.Foto_Cedula_Frontal = await uploadFile(await compressImageToFile(registrationFiles.frontal), `${rut}_CEDULA_FRONTAL`);
       }
       if (registrationFiles.reverso) {
-        docPayload.Foto_Cedula_Reverso = await uploadFile(await compressImageToFile(registrationFiles.reverso));
+        docPayload.Foto_Cedula_Reverso = await uploadFile(await compressImageToFile(registrationFiles.reverso), `${rut}_CEDULA_REVERSO`);
       }
       if (registrationFiles.antecedentes) {
-        docPayload.Antecedentes_PDF = await uploadFile(registrationFiles.antecedentes);
+        docPayload.Antecedentes_PDF = await uploadFile(registrationFiles.antecedentes, `${rut}_ANTECEDENTES`);
       }
 
       // Si es menor y hay documentos de apoderado
       let obs = formData.Observaciones;
       if (isMinor && registrationFiles.frontalApoderado && registrationFiles.reversoApoderado) {
-        const apFrontal = await uploadFile(await compressImageToFile(registrationFiles.frontalApoderado));
-        const apReverso = await uploadFile(await compressImageToFile(registrationFiles.reversoApoderado));
+        const apFrontal = await uploadFile(await compressImageToFile(registrationFiles.frontalApoderado), `${rut}_APODERADO_FRONTAL`);
+        const apReverso = await uploadFile(await compressImageToFile(registrationFiles.reversoApoderado), `${rut}_APODERADO_REVERSO`);
         obs = `${obs} | APODERADO OK | Doc Apoderado: ${apFrontal} , ${apReverso}`;
       }
+
 
       // 3. Crear el jugador con los links de Cloudinary
       const payload = { 
@@ -194,8 +196,10 @@ export default function Dashboard() {
   };
 
   // Sube un File directamente a Google Drive vía Apps Script
-  const uploadFile = async (file: File): Promise<string> => {
+  const uploadFile = async (file: File, customName: string): Promise<string> => {
     const base64 = await getBase64(file);
+    const extension = file.name.split('.').pop();
+    const finalFileName = `${customName}.${extension}`;
     
     const res = await fetch('/api/players', {
       method: 'POST',
@@ -203,7 +207,7 @@ export default function Dashboard() {
       body: JSON.stringify({
         action: "UPLOAD_FILE",
         fileData: base64,
-        fileName: file.name,
+        fileName: finalFileName,
         mimeType: file.type
       })
     });
@@ -253,14 +257,16 @@ export default function Dashboard() {
         RUT: selectedPlayer.RUT 
       };
 
+      const rut = selectedPlayer.RUT.trim() || 'SIN_RUT';
+
       if (selectedFiles.frontal) {
-        payload.Foto_Cedula_Frontal = await uploadFile(await compressImageToFile(selectedFiles.frontal));
+        payload.Foto_Cedula_Frontal = await uploadFile(await compressImageToFile(selectedFiles.frontal), `${rut}_CEDULA_FRONTAL`);
       }
       if (selectedFiles.reverso) {
-        payload.Foto_Cedula_Reverso = await uploadFile(await compressImageToFile(selectedFiles.reverso));
+        payload.Foto_Cedula_Reverso = await uploadFile(await compressImageToFile(selectedFiles.reverso), `${rut}_CEDULA_REVERSO`);
       }
       if (selectedFiles.antecedentes) {
-        payload.Antecedentes_PDF = await uploadFile(selectedFiles.antecedentes);
+        payload.Antecedentes_PDF = await uploadFile(selectedFiles.antecedentes, `${rut}_ANTECEDENTES`);
       }
 
       // Evaluar Auto-Status

@@ -84,8 +84,10 @@ export default function RegistroPublico() {
   };
 
   // Sube un archivo directamente a Google Drive vía Apps Script
-  const uploadFile = async (file: File): Promise<string> => {
+  const uploadFile = async (file: File, customName: string): Promise<string> => {
     const base64 = await getBase64(file);
+    const extension = file.name.split('.').pop();
+    const finalFileName = `${customName}.${extension}`;
     
     const res = await fetch('/api/players', {
       method: 'POST',
@@ -93,7 +95,7 @@ export default function RegistroPublico() {
       body: JSON.stringify({
         action: "UPLOAD_FILE",
         fileData: base64,
-        fileName: file.name,
+        fileName: finalFileName,
         mimeType: file.type
       })
     });
@@ -159,22 +161,24 @@ export default function RegistroPublico() {
     setError(null);
     
     try {
+      const rut = formData.RUT.trim() || 'SIN_RUT';
+      
       setUploadProgress('Subiendo cédula frontal...');
-      const frontalUrl = await uploadFile(await compressImageToFile(files.frontal!));
+      const frontalUrl = await uploadFile(await compressImageToFile(files.frontal!), `${rut}_CEDULA_FRONTAL`);
       
       setUploadProgress('Subiendo cédula reverso...');
-      const reversoUrl = await uploadFile(await compressImageToFile(files.reverso!));
+      const reversoUrl = await uploadFile(await compressImageToFile(files.reverso!), `${rut}_CEDULA_REVERSO`);
       
       setUploadProgress('Subiendo antecedentes (PDF)...');
-      const antecedentesUrl = await uploadFile(files.antecedentes!);
+      const antecedentesUrl = await uploadFile(files.antecedentes!, `${rut}_ANTECEDENTES`);
 
       let frontalApoderadoUrl = '';
       let reversoApoderadoUrl = '';
 
       if (isMinor) {
         setUploadProgress('Subiendo documentos del apoderado...');
-        frontalApoderadoUrl = await uploadFile(await compressImageToFile(files.frontalApoderado!));
-        reversoApoderadoUrl = await uploadFile(await compressImageToFile(files.reversoApoderado!));
+        frontalApoderadoUrl = await uploadFile(await compressImageToFile(files.frontalApoderado!), `${rut}_APODERADO_FRONTAL`);
+        reversoApoderadoUrl = await uploadFile(await compressImageToFile(files.reversoApoderado!), `${rut}_APODERADO_REVERSO`);
       }
 
       setUploadProgress("Finalizando registro...");
