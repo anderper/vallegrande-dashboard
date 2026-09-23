@@ -1,36 +1,46 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Valle Grande FC
 
-## Getting Started
+Aplicación para inscripciones y expedientes de jugadores de la Liga Comunal Lampa.
 
-First, run the development server:
+## Funciones
 
-```bash
+- Inscripción pública en `/registro`: datos, documentos, recorte de foto desde la cédula y firma dibujada en pantalla.
+- Autorización del jugador y, para menores, datos, documentos y firma del apoderado.
+- Dashboard: faltantes por jugador, edición de ficha, tipo de trámite y estado manual Pendiente / Por federar / Federado.
+- PDF con ficha, foto, firma, autorización, ambas caras de la cédula y certificado de antecedentes completo.
+- Importación y exportación CSV existentes.
+
+## Desarrollo
+
+Requiere Node.js 20.9 o superior y las dependencias instaladas con `npm ci`.
+
+Configura `.env.local` con `GOOGLE_SCRIPT_URL` apuntando a tu implementación de Apps Script. `NEXT_PUBLIC_GOOGLE_SCRIPT_URL` sigue aceptándose para compatibilidad. No se deben incluir credenciales en el repositorio.
+
+```sh
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm test
+npm run lint
+npm run build
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Si Turbopack falla al resolver Tailwind en Windows, usa `npm run dev -- --webpack` para la vista previa. La compilación de producción usa Turbopack. La fuente Inter se descarga durante la compilación y requiere acceso de red.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Conexión con Google
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+El reemplazo completo del backend está en [google-apps-script/Code.gs](google-apps-script/Code.gs). Sigue [las instrucciones de actualización](google-apps-script/README.md). El script añade columnas a la hoja `Jugadores` sin borrar los registros existentes.
 
-## Learn More
+La nueva interfaz comprueba la versión del backend antes de permitir cargas, para evitar que una implementación antigua descarte firmas o fotos silenciosamente. El script debe actualizarse junto con el despliegue de Vercel.
 
-To learn more about Next.js, take a look at the following resources:
+## Pruebas sin datos reales
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+En una terminal ejecuta `node --import tsx tests/demo-server.ts`. En otra terminal, configura `GOOGLE_SCRIPT_URL=http://127.0.0.1:9876/exec` solo para ese proceso y ejecuta `npm run dev -- --webpack --hostname 127.0.0.1 --port 3001`.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+La vista previa tendrá registros ficticios en memoria; no escribe en Sheets ni en Drive. El servidor de demostración solo escucha en localhost y no se permite en producción.
 
-## Deploy on Vercel
+Las pruebas ejercitan el mismo `Code.gs` con un simulador de Sheets/Drive, verifican el API y generan PDFs de adultos/menores, incluidos anexos multipágina. El flujo real requiere comprobar permisos y actualización de la implementación en Google.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Límites actuales
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+El proyecto mantiene el modelo de acceso administrativo anterior, sin inicio de sesión. El token opcional entre Next.js y Apps Script no autentica a los usuarios del dashboard. Implementar acceso de dirigentes es una tarea pendiente antes de restringir el acceso a información personal.
+
+La firma del club y el espacio de la liga permanecen en blanco para su gestión posterior. Los documentos históricos con enlaces públicos conservan sus permisos; los nuevos archivos no se publican individualmente mediante Drive.

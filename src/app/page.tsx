@@ -1,6 +1,11 @@
 'use client';
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { RegistrationForm } from "@/components/registration-form";
+import { PlayerDossier } from "@/components/player-dossier";
+import { missingRequirements, normalizePlayer, normalizeRut, statusOf, type Player } from "@/lib/registration";
+import Image from "next/image";
+import type { LucideIcon } from "lucide-react";
 import {
   LayoutDashboard,
   Users,
@@ -14,7 +19,6 @@ import {
   Loader2,
   RefreshCw,
   X,
-  Save,
   Baby,
   Flame,
   User,
@@ -29,19 +33,7 @@ import {
   Download,
   Filter,
   Upload,
-  UserPlus
 } from "lucide-react";
-
-interface Player {
-  ID_Jugador: string;
-  RUT: string;
-  Nombres: string;
-  Apellido_Paterno: string;
-  Apellido_Materno: string;
-  Serie: string;
-  Status_Validacion: string;
-  [key: string]: any;
-}
 
 export default function Dashboard() {
   const [players, setPlayers] = useState<Player[]>([]);
@@ -52,265 +44,15 @@ export default function Dashboard() {
   // Estados para el Modal de Registro
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  // Estados para el Perfil del Jugador
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [selectedFiles, setSelectedFiles] = useState<{frontal?: File, reverso?: File, antecedentes?: File}>({});
-  const [registrationFiles, setRegistrationFiles] = useState<{frontal?: File, reverso?: File, antecedentes?: File, frontalApoderado?: File, reversoApoderado?: File}>({});
-  const [formData, setFormData] = useState({
-    RUT: "",
-    Nombres: "",
-    Apellido_Paterno: "",
-    Apellido_Materno: "",
-    Fecha_Nacimiento: "",
-    Nacionalidad: "Chile",
-    Serie: "",
-    WhatsApp: "",
-    Direccion: "",
-    Posicion: "",
-    Observaciones: ""
-  });
+  const [loadError, setLoadError] = useState("");
 
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      // Agregamos un timestamp para que el navegador nunca use datos cacheados
-      const res = await fetch(`/api/players?t=${new Date().getTime()}`, { cache: 'no-store' });
-      
-      if (!res.ok) {
-        throw new Error(`Error del servidor: ${res.status}`);
-      }
-
-      const data = await res.json();
-      
-      if (data && Array.isArray(data)) {
-        setPlayers(data);
-      } else {
-        console.error("Los datos recibidos no son un array:", data);
-        setPlayers([]);
-      }
-    } catch (error) {
-      console.error("Error detallado al conectar con Google Sheets:", error);
-      // No dejamos que el error rompa la ejecución, simplemente mostramos lista vacía
-      setPlayers([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    try {
-      // 1. Detectar si es menor de edad
-      const today = new Date();
-      const birthDate = new Date(formData.Fecha_Nacimiento);
-      let age = today.getFullYear() - birthDate.getFullYear();
-      const m = today.getMonth() - birthDate.getMonth();
-      if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
-      const isMinor = age < 18;
-
-      // 2. Subir archivos a Cloudinary si existen
-      const docPayload: any = {};
-      const rut = formData.RUT.trim() || 'SIN_RUT';
-      
-      if (registrationFiles.frontal) {
-        docPayload.Foto_Cedula_Frontal = await uploadFile(await compressImageToFile(registrationFiles.frontal), `${rut}_CEDULA_FRONTAL`);
-      }
-      if (registrationFiles.reverso) {
-        docPayload.Foto_Cedula_Reverso = await uploadFile(await compressImageToFile(registrationFiles.reverso), `${rut}_CEDULA_REVERSO`);
-      }
-      if (registrationFiles.antecedentes) {
-        docPayload.Antecedentes_PDF = await uploadFile(registrationFiles.antecedentes, `${rut}_ANTECEDENTES`);
-      }
-
-      // Si es menor y hay documentos de apoderado
-      let obs = formData.Observaciones;
-      if (isMinor && registrationFiles.frontalApoderado && registrationFiles.reversoApoderado) {
-        const apFrontal = await uploadFile(await compressImageToFile(registrationFiles.frontalApoderado), `${rut}_APODERADO_FRONTAL`);
-        const apReverso = await uploadFile(await compressImageToFile(registrationFiles.reversoApoderado), `${rut}_APODERADO_REVERSO`);
-        obs = `${obs} | APODERADO OK | Doc Apoderado: ${apFrontal} , ${apReverso}`;
-      }
-
-
-      // 3. Crear el jugador con los links de Cloudinary
-      const payload = { 
-        ...formData, 
-        ...docPayload,
-        Observaciones: obs,
-        action: "CREATE",
-        Status_Validacion: (docPayload.Foto_Cedula_Frontal && docPayload.Foto_Cedula_Reverso && docPayload.Antecedentes_PDF) ? "POR FEDERAR" : "Pendiente"
-      };
-
-      console.log("DEBUG: Enviando payload CREACIÓN desde Dashboard:", payload);
-
-      const res = await fetch('/api/players', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      const result = await res.json();
-      if (result.success) {
-        setIsModalOpen(false);
-        setFormData({
-          RUT: "", Nombres: "", Apellido_Paterno: "", Apellido_Materno: "",
-          Fecha_Nacimiento: "", Nacionalidad: "Chile", Serie: "",
-          WhatsApp: "", Direccion: "", Posicion: "", Observaciones: ""
-        });
-        setRegistrationFiles({});
-        fetchData();
-      } else {
-        alert("Hubo un error al guardar: " + result.error);
-      }
-    } catch (error) {
-      console.error("Error al enviar:", error);
-      alert("Error de conexión al guardar.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // ----- FUNCIONES DE COMPRESIÓN Y SUBIDA -----
-
-  const getBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => {
-        const base64 = (reader.result as string).split(',')[1];
-        resolve(base64);
-      };
-      reader.onerror = (e) => reject(e);
-    });
-  };
-
-  // Sube un File directamente a Google Drive vía Apps Script
-  const uploadFile = async (file: File, customName: string): Promise<string> => {
-    const base64 = await getBase64(file);
-    const extension = file.name.split('.').pop();
-    const finalFileName = `${customName}.${extension}`;
-    
-    const res = await fetch('/api/players', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: "UPLOAD_FILE",
-        fileData: base64,
-        fileName: finalFileName,
-        mimeType: file.type
-      })
-    });
-    
-    const data = await res.json();
-    if (!res.ok || !data.success) {
-      console.error('Upload Error:', data);
-      throw new Error(data?.error || 'Error al subir archivo a Drive');
-    }
-    return data.url;
-  };
-
-
-  // Comprime una imagen y devuelve un File .jpg listo para subir
-  const compressImageToFile = (file: File): Promise<File> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onerror = reject;
-      reader.onload = (event) => {
-        const img = new Image();
-        img.src = event.target?.result as string;
-        img.onerror = reject;
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const MAX_WIDTH = 1024;
-          const scale = img.width > MAX_WIDTH ? MAX_WIDTH / img.width : 1;
-          canvas.width = img.width * scale;
-          canvas.height = img.height * scale;
-          canvas.getContext('2d')?.drawImage(img, 0, 0, canvas.width, canvas.height);
-          canvas.toBlob((blob) => {
-            if (!blob) return reject(new Error('Error al comprimir imagen'));
-            resolve(new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' }));
-          }, 'image/jpeg', 0.75);
-        };
-      };
-    });
-  };
-
-  const handleUpdatePlayerDocs = async (newStatus?: string) => {
-    if (!selectedPlayer) return;
-    setIsUploading(true);
-
-    try {
-      const payload: any = { 
-        action: "UPDATE_DOCS", 
-        RUT: selectedPlayer.RUT 
-      };
-
-      const rut = selectedPlayer.RUT.trim() || 'SIN_RUT';
-
-      if (selectedFiles.frontal) {
-        payload.Foto_Cedula_Frontal = await uploadFile(await compressImageToFile(selectedFiles.frontal), `${rut}_CEDULA_FRONTAL`);
-      }
-      if (selectedFiles.reverso) {
-        payload.Foto_Cedula_Reverso = await uploadFile(await compressImageToFile(selectedFiles.reverso), `${rut}_CEDULA_REVERSO`);
-      }
-      if (selectedFiles.antecedentes) {
-        payload.Antecedentes_PDF = await uploadFile(selectedFiles.antecedentes, `${rut}_ANTECEDENTES`);
-      }
-
-      // Evaluar Auto-Status
-      const hasFrontal = payload.Foto_Cedula_Frontal || selectedPlayer.Foto_Cedula_Frontal;
-      const hasReverso = payload.Foto_Cedula_Reverso || selectedPlayer.Foto_Cedula_Reverso;
-      const hasAntecedentes = payload.Antecedentes_PDF || selectedPlayer.Antecedentes_PDF;
-      
-      let finalStatus = newStatus || selectedPlayer.Status_Validacion;
-      
-      // Auto-cambio si se subieron los 3 y está en Pendiente
-      if (!newStatus && (selectedPlayer.Status_Validacion === 'Pendiente' || !selectedPlayer.Status_Validacion)) {
-        if (hasFrontal && hasReverso && hasAntecedentes) {
-          finalStatus = "POR FEDERAR";
-        }
-      }
-
-      if (finalStatus !== selectedPlayer.Status_Validacion) {
-        payload.newStatus = finalStatus;
-      }
-
-      console.log("DEBUG: Enviando payload ACTUALIZACIÓN desde Dashboard:", payload);
-
-      const res = await fetch('/api/players', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      const result = await res.json();
-      if (result.success) {
-        alert("¡Datos actualizados con éxito!");
-        setSelectedFiles({});
-        setSelectedPlayer(null);
-        fetchData();
-      } else {
-        alert("Error de Apps Script: " + result.error);
-      }
-    } catch (error) {
-      console.error(error);
-      alert("Error al enviar los archivos.");
-    } finally {
-      setIsUploading(false);
-    }
-  };
+  const fetchData = useCallback(() => fetch('/api/players', { cache: 'no-store' })
+    .then(async response => { if (!response.ok) throw new Error((await response.json()).error || 'Error de conexión'); return response.json(); })
+    .then(data => { if (!Array.isArray(data)) throw new Error('La respuesta no contiene una lista de jugadores.'); setPlayers(data.map(normalizePlayer)); setLoadError(''); })
+    .catch(error => setLoadError(error instanceof Error ? error.message : 'No se pudo cargar la lista.'))
+    .finally(() => setLoading(false)), []);
+  useEffect(() => { void fetchData(); }, [fetchData]);
 
   const stats = [
     { label: "Total Jugadores", value: (players || []).length, icon: Users, color: "text-blue-500", bg: "bg-blue-500/10" },
@@ -348,8 +90,8 @@ export default function Dashboard() {
     const apellido = p.Apellido_Paterno || p.Apellidos || "";
     const rut = p.RUT || "";
     
-    const normalize = (str: any) => (str || "").toString().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-    const cleanRut = (r: any) => (r || "").toString().replace(/[\.\-]/g, '').toLowerCase();
+    const normalize = (str: string) => (str || "").toString().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    const cleanRut = (r: string) => (r || "").toString().replace(/[\.\-]/g, '').toLowerCase();
     
     const fullName = normalize(nombre + " " + apellido);
     const searchTerm = normalize(search);
@@ -363,7 +105,8 @@ export default function Dashboard() {
       {/* Sidebar */}
       <aside className="w-64 border-r border-slate-800 p-6 hidden md:block z-10 bg-slate-950">
         <div className="flex items-center gap-3 mb-10">
-          <img
+          <Image
+            width={48} height={48}
             src="/logo.png"
             alt="Logo Valle Grande FC"
             className="w-12 h-12 object-contain drop-shadow-md"
@@ -395,7 +138,7 @@ export default function Dashboard() {
                 {currentView === 'dashboard' ? 'Panel de Control' : currentView === 'jugadores' ? 'Directorio de Jugadores' : 'Reportabilidad & Listas'}
               </h1>
               <button
-                onClick={fetchData}
+                onClick={() => { setLoading(true); void fetchData(); }}
                 className="p-2 hover:bg-slate-900 rounded-lg transition-colors text-slate-400 shrink-0"
                 title="Actualizar datos"
               >
@@ -404,7 +147,7 @@ export default function Dashboard() {
             </div>
           </div>
           
-          <p className="text-slate-400 mt-1 hidden md:block">Gestión documental en tiempo real.</p>
+          <p className="text-slate-400 mt-1 hidden md:block">Inscripciones y fichas para la liga.</p>
 
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
             {currentView === 'dashboard' && (
@@ -431,6 +174,7 @@ export default function Dashboard() {
           </div>
         </header>
 
+        {loadError && <p role="alert" className="mb-6 rounded-xl border border-rose-500/30 bg-rose-500/10 p-4 text-rose-300">No se pudieron actualizar los datos. {loadError}</p>}
         {currentView === 'dashboard' ? (
           <>
             {/* Stats Grid */}
@@ -480,7 +224,7 @@ export default function Dashboard() {
                           <tr key={i} onClick={() => setSelectedPlayer(player)} className="hover:bg-slate-900/50 transition-colors cursor-pointer group">
                             <td className="px-6 py-4">
                               <div className="font-medium text-slate-200">{player.Nombres || player.Nombre} {player.Apellido_Paterno || player.Apellidos}</div>
-                              <div className="text-xs text-slate-500 font-mono mt-0.5">{player.RUT}</div>
+                              <div className="text-xs text-slate-500 font-mono mt-0.5">{player.RUT}</div><Completeness player={player} />
                             </td>
                             <td className="px-6 py-4">
                               <span className="text-sm text-slate-300 bg-slate-800/50 px-2 py-1 rounded-md border border-slate-700/50 whitespace-nowrap">
@@ -565,347 +309,14 @@ export default function Dashboard() {
       {/* Modal Importar */}
       {isImportModalOpen && <ImportModal onClose={() => setIsImportModalOpen(false)} onRefresh={fetchData} />}
 
-      {/* Modal de Registro */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="glass-card w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl shadow-black">
-            <div className="sticky top-0 bg-slate-900/90 backdrop-blur-md p-6 border-b border-slate-800 flex items-center justify-between z-10">
-              <h2 className="text-xl font-bold text-white">Registrar Nuevo Jugador</h2>
-              <button
-                onClick={() => setIsModalOpen(false)}
-                className="p-2 hover:bg-slate-800 rounded-full transition-colors text-slate-400 hover:text-white"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+      {isModalOpen && <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm p-2 sm:p-5 flex items-center justify-center" role="dialog" aria-modal="true" aria-label="Registrar jugador"><div className="bg-slate-950 border border-slate-700 rounded-2xl max-w-3xl w-full max-h-[94dvh] overflow-y-auto p-5"><div className="flex justify-between items-center mb-6"><h2 className="text-xl font-bold">Nueva inscripción</h2><button aria-label="Cerrar registro" onClick={() => setIsModalOpen(false)}><X /></button></div><RegistrationForm admin onSaved={() => { setIsModalOpen(false); void fetchData(); }} /></div></div>}
+      {selectedPlayer && <PlayerDossier key={selectedPlayer.RUT} player={selectedPlayer} onClose={() => setSelectedPlayer(null)} onUpdated={saved => { setPlayers(prev => prev.map(p => normalizeRut(p.RUT) === normalizeRut(saved.RUT) ? saved : p)); setSelectedPlayer(saved); }} />}
 
-            <form onSubmit={handleSubmit} className="p-6 space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Datos Personales */}
-                <div className="space-y-4">
-                  <h3 className="text-sm font-bold text-brand-400 uppercase tracking-wider mb-4 border-b border-slate-800 pb-2">Datos Personales</h3>
-
-                  <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1">RUT *</label>
-                    <input required name="RUT" value={formData.RUT} onChange={handleInputChange} type="text" placeholder="12.345.678-9" className="input-field w-full text-sm" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1">Nombres *</label>
-                    <input required name="Nombres" value={formData.Nombres} onChange={handleInputChange} type="text" className="input-field w-full text-sm" />
-                  </div>
-                  <div className="flex gap-4">
-                    <div className="flex-1">
-                      <label className="block text-xs font-medium text-slate-400 mb-1">Ap. Paterno *</label>
-                      <input required name="Apellido_Paterno" value={formData.Apellido_Paterno} onChange={handleInputChange} type="text" className="input-field w-full text-sm" />
-                    </div>
-                    <div className="flex-1">
-                      <label className="block text-xs font-medium text-slate-400 mb-1">Ap. Materno</label>
-                      <input name="Apellido_Materno" value={formData.Apellido_Materno} onChange={handleInputChange} type="text" className="input-field w-full text-sm" />
-                    </div>
-                  </div>
-                  <div className="flex gap-4">
-                    <div className="flex-1">
-                      <label className="block text-xs font-medium text-slate-400 mb-1">Nacimiento *</label>
-                      <input required name="Fecha_Nacimiento" value={formData.Fecha_Nacimiento} onChange={handleInputChange} type="date" className="input-field w-full text-sm" />
-                    </div>
-                    <div className="flex-1">
-                      <label className="block text-xs font-medium text-slate-400 mb-1">Nacionalidad</label>
-                      <select name="Nacionalidad" value={formData.Nacionalidad} onChange={handleInputChange} className="input-field w-full text-sm appearance-none">
-                        <option value="Chile">Chile</option>
-                        <option value="Argentina">Argentina</option>
-                        <option value="Bolivia">Bolivia</option>
-                        <option value="Brasil">Brasil</option>
-                        <option value="Colombia">Colombia</option>
-                        <option value="Ecuador">Ecuador</option>
-                        <option value="Paraguay">Paraguay</option>
-                        <option value="Perú">Perú</option>
-                        <option value="Uruguay">Uruguay</option>
-                        <option value="Venezuela">Venezuela</option>
-                        <option disabled>──────────</option>
-                        <option value="México">México</option>
-                        <option value="Estados Unidos">Estados Unidos</option>
-                        <option value="Canadá">Canadá</option>
-                        <option value="Costa Rica">Costa Rica</option>
-                        <option value="Cuba">Cuba</option>
-                        <option value="El Salvador">El Salvador</option>
-                        <option value="Guatemala">Guatemala</option>
-                        <option value="Honduras">Honduras</option>
-                        <option value="Nicaragua">Nicaragua</option>
-                        <option value="Panamá">Panamá</option>
-                        <option value="Puerto Rico">Puerto Rico</option>
-                        <option value="República Dominicana">República Dominicana</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Club & Contacto */}
-                <div className="space-y-4">
-                  <h3 className="text-sm font-bold text-brand-400 uppercase tracking-wider mb-4 border-b border-slate-800 pb-2">Club & Contacto</h3>
-
-                  <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1">Serie *</label>
-                    <select required name="Serie" value={formData.Serie} onChange={handleInputChange} className="input-field w-full text-sm appearance-none">
-                      <option value="">Selecciona una serie...</option>
-                      <option value="1ERA INFANTIL">1ERA INFANTIL</option>
-                      <option value="2DA INFANTIL">2DA INFANTIL</option>
-                      <option value="3RA INFANTIL">3RA INFANTIL</option>
-                      <option value="4TA INFANTIL">4TA INFANTIL</option>
-                      <option value="JUVENIL">JUVENIL</option>
-                      <option value="3RA ADULTA">3RA ADULTA</option>
-                      <option value="2DA ADULTA">2DA ADULTA</option>
-                      <option value="1ERA ADULTA">1ERA ADULTA</option>
-                      <option value="SENIOR">SENIOR</option>
-                      <option value="SUPER SENIOR">SUPER SENIOR</option>
-                      <option value="DORADOS">DORADOS</option>
-                      <option value="FEMENINA INFANTIL">FEMENINA INFANTIL</option>
-                      <option value="FEMENINA ADULTA">FEMENINA ADULTA</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1">Posición</label>
-                    <select name="Posicion" value={formData.Posicion} onChange={handleInputChange} className="input-field w-full text-sm appearance-none">
-                      <option value="">Selecciona posición...</option>
-                      <option value="Portero">Portero</option>
-                      <option value="Defensa">Defensa</option>
-                      <option value="Mediocampista">Mediocampista</option>
-                      <option value="Delantero">Delantero</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1">WhatsApp</label>
-                    <input name="WhatsApp" value={formData.WhatsApp} onChange={handleInputChange} type="text" placeholder="+56912345678" className="input-field w-full text-sm" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1">Dirección</label>
-                    <input name="Direccion" value={formData.Direccion} onChange={handleInputChange} type="text" className="input-field w-full text-sm" />
-                  </div>
-                </div>
-
-                {/* Documentación en Registro */}
-                <div className="space-y-4">
-                  <h3 className="text-sm font-bold text-brand-400 uppercase tracking-wider mb-4 border-b border-slate-800 pb-2">Documentación Obligatoria</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="space-y-1">
-                      <label className="text-[10px] text-slate-500 uppercase">Cédula Frontal</label>
-                      <input type="file" accept="image/*" onChange={(e) => e.target.files && setRegistrationFiles({...registrationFiles, frontal: e.target.files[0]})} className="input-field w-full text-xs" />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] text-slate-500 uppercase">Cédula Reverso</label>
-                      <input type="file" accept="image/*" onChange={(e) => e.target.files && setRegistrationFiles({...registrationFiles, reverso: e.target.files[0]})} className="input-field w-full text-xs" />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] text-slate-500 uppercase">Antecedentes</label>
-                      <input type="file" accept="application/pdf" onChange={(e) => e.target.files && setRegistrationFiles({...registrationFiles, antecedentes: e.target.files[0]})} className="input-field w-full text-xs" />
-                    </div>
-                  </div>
-                  
-                  {/* Si es menor de edad, mostrar campos para apoderado */}
-                  {(() => {
-                    if (!formData.Fecha_Nacimiento) return null;
-                    const today = new Date();
-                    const birthDate = new Date(formData.Fecha_Nacimiento);
-                    let age = today.getFullYear() - birthDate.getFullYear();
-                    const m = today.getMonth() - birthDate.getMonth();
-                    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
-                    
-                    if (age < 18) {
-                      return (
-                        <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl space-y-4">
-                          <p className="text-xs text-blue-300 font-bold flex items-center gap-2">
-                            <ShieldCheck className="w-4 h-4" /> REQUERIDO: Documentos del Apoderado
-                          </p>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-1">
-                              <label className="text-[10px] text-slate-500 uppercase">Apoderado Frontal</label>
-                              <input type="file" accept="image/*" onChange={(e) => e.target.files && setRegistrationFiles({...registrationFiles, frontalApoderado: e.target.files[0]})} className="input-field w-full text-xs" />
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-[10px] text-slate-500 uppercase">Apoderado Reverso</label>
-                              <input type="file" accept="image/*" onChange={(e) => e.target.files && setRegistrationFiles({...registrationFiles, reversoApoderado: e.target.files[0]})} className="input-field w-full text-xs" />
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    }
-                    return null;
-                  })()}
-                </div>
-              </div>
-
-              <div className="pt-6 border-t border-slate-800 flex justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-6 py-2 text-sm font-medium text-slate-300 hover:text-white transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="btn-primary text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isSubmitting ? (
-                    <><Loader2 className="w-4 h-4 animate-spin" /> Guardando...</>
-                  ) : (
-                    <><Save className="w-4 h-4" /> Guardar Jugador</>
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Modal de Perfil de Jugador / Gestión Documental */}
-      {selectedPlayer && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="glass-card w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl shadow-black overflow-hidden">
-            {/* Header del Perfil */}
-            <div className="bg-slate-900/90 backdrop-blur-md p-6 border-b border-slate-800 flex items-start justify-between">
-              <div className="flex gap-4 items-center">
-                <div className="w-16 h-16 rounded-full bg-brand-500/20 text-brand-400 flex items-center justify-center text-2xl font-bold border border-brand-500/30">
-                  {selectedPlayer.Nombres?.charAt(0) || "J"}
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold text-white">{selectedPlayer.Nombres?.trim() || selectedPlayer.Nombre?.trim()} {selectedPlayer.Apellido_Paterno?.trim() || selectedPlayer.Apellidos?.trim()}</h2>
-                  <div className="flex gap-3 text-sm text-slate-400 mt-1">
-                    <span className="font-mono">{selectedPlayer.RUT}</span>
-                    <span>•</span>
-                    <span className="font-medium text-slate-300">{selectedPlayer.Serie}</span>
-                  </div>
-                </div>
-              </div>
-              <button onClick={() => {setSelectedPlayer(null); setSelectedFiles({});}} className="p-2 hover:bg-slate-800 rounded-full transition-colors text-slate-400">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-6 space-y-8">
-              {/* Estado de Validación */}
-              <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between p-5 bg-slate-900/50 rounded-2xl border border-slate-800">
-                <div>
-                  <h3 className="text-sm text-slate-400 mb-1">Estado de Federación</h3>
-                  <span className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-bold border whitespace-nowrap ${
-                    selectedPlayer.Status_Validacion?.toUpperCase() === 'FEDERADO' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' :
-                    selectedPlayer.Status_Validacion?.toUpperCase() === 'POR FEDERAR' ? 'bg-blue-500/10 text-blue-400 border-blue-500/30' :
-                    'bg-amber-500/10 text-amber-400 border-amber-500/30'
-                  }`}>
-                    <ShieldCheck className="w-4 h-4" />
-                    {(selectedPlayer.Status_Validacion || 'PENDIENTE').toUpperCase()}
-                  </span>
-                </div>
-                
-                {/* Controles Manuales de Estado */}
-                <div className="flex gap-2">
-                  {selectedPlayer.Status_Validacion?.toUpperCase() === 'POR FEDERAR' && (
-                     <button onClick={() => handleUpdatePlayerDocs("FEDERADO")} disabled={isUploading} className="btn-primary py-2 px-4 text-xs font-bold">
-                       Aprobar: Federado
-                     </button>
-                  )}
-                  {selectedPlayer.Status_Validacion?.toUpperCase() === 'FEDERADO' && (
-                     <button onClick={() => handleUpdatePlayerDocs("POR FEDERAR")} disabled={isUploading} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs font-bold transition-colors">
-                       Revertir Estado
-                     </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Gestión de Documentos */}
-              <div>
-                <h3 className="text-sm font-bold text-brand-400 uppercase tracking-wider mb-4 border-b border-slate-800 pb-2">Gestión Documental</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  
-                  {/* Carnet Frontal */}
-                  <div className="space-y-2">
-                    <label className="block text-sm font-medium text-slate-300">Cédula (Frontal)</label>
-                    {selectedPlayer.Foto_Cedula_Frontal?.trim() ? (
-                      <a href={selectedPlayer.Foto_Cedula_Frontal} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 p-4 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl hover:bg-emerald-500/20 transition-colors">
-                        <ImageIcon className="w-5 h-5" /> Ver Documento
-                      </a>
-                    ) : (
-                      <div className="relative border-2 border-dashed border-slate-700 hover:border-brand-500 rounded-xl p-4 text-center cursor-pointer transition-colors group">
-                        <input type="file" accept="image/jpeg, image/png, image/webp" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={(e) => {
-                          if (e.target.files && e.target.files[0]) setSelectedFiles({...selectedFiles, frontal: e.target.files[0]});
-                        }} />
-                        <UploadCloud className={`w-8 h-8 mx-auto mb-2 ${selectedFiles.frontal ? 'text-brand-400' : 'text-slate-500 group-hover:text-brand-400'}`} />
-                        <span className="text-xs text-slate-400 truncate block w-full px-2" title={selectedFiles.frontal?.name}>{selectedFiles.frontal ? selectedFiles.frontal.name : "Subir (JPG/PNG)"}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Carnet Reverso */}
-                  <div className="space-y-2">
-                    <label className="block text-sm font-medium text-slate-300">Cédula (Reverso)</label>
-                    {selectedPlayer.Foto_Cedula_Reverso?.trim() ? (
-                      <a href={selectedPlayer.Foto_Cedula_Reverso} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 p-4 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl hover:bg-emerald-500/20 transition-colors">
-                        <ImageIcon className="w-5 h-5" /> Ver Documento
-                      </a>
-                    ) : (
-                      <div className="relative border-2 border-dashed border-slate-700 hover:border-brand-500 rounded-xl p-4 text-center cursor-pointer transition-colors group">
-                        <input type="file" accept="image/jpeg, image/png, image/webp" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={(e) => {
-                          if (e.target.files && e.target.files[0]) setSelectedFiles({...selectedFiles, reverso: e.target.files[0]});
-                        }} />
-                        <UploadCloud className={`w-8 h-8 mx-auto mb-2 ${selectedFiles.reverso ? 'text-brand-400' : 'text-slate-500 group-hover:text-brand-400'}`} />
-                        <span className="text-xs text-slate-400 truncate block w-full px-2" title={selectedFiles.reverso?.name}>{selectedFiles.reverso ? selectedFiles.reverso.name : "Subir (JPG/PNG)"}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Antecedentes */}
-                  <div className="space-y-2">
-                    <label className="block text-sm font-medium text-slate-300">Antecedentes Penales</label>
-                    {selectedPlayer.Antecedentes_PDF?.trim() ? (
-                      <a href={selectedPlayer.Antecedentes_PDF} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 p-4 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl hover:bg-emerald-500/20 transition-colors">
-                        <FileText className="w-5 h-5" /> Ver Documento (PDF)
-                      </a>
-                    ) : (
-                      <div className="relative border-2 border-dashed border-slate-700 hover:border-brand-500 rounded-xl p-4 text-center cursor-pointer transition-colors group">
-                        <input type="file" accept="application/pdf" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={(e) => {
-                          if (e.target.files && e.target.files[0]) setSelectedFiles({...selectedFiles, antecedentes: e.target.files[0]});
-                        }} />
-                        <UploadCloud className={`w-8 h-8 mx-auto mb-2 ${selectedFiles.antecedentes ? 'text-brand-400' : 'text-slate-500 group-hover:text-brand-400'}`} />
-                        <span className="text-xs text-slate-400 truncate block w-full px-2" title={selectedFiles.antecedentes?.name}>{selectedFiles.antecedentes ? selectedFiles.antecedentes.name : "Subir (PDF)"}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Info Text */}
-                <div className="mt-4 p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl">
-                  <p className="text-xs text-blue-300 leading-relaxed">
-                    <strong>Sistema Automático:</strong> Al guardar los 3 documentos faltantes, el estado cambiará automáticamente de "PENDIENTE" a "POR FEDERAR".
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Acciones */}
-            <div className="p-6 border-t border-slate-800 bg-slate-900/50 flex justify-end gap-3">
-              <button onClick={() => {setSelectedPlayer(null); setSelectedFiles({});}} className="px-6 py-2 text-sm font-medium text-slate-300 hover:text-white transition-colors">
-                Cerrar
-              </button>
-              <button 
-                onClick={() => handleUpdatePlayerDocs()}
-                disabled={isUploading || Object.keys(selectedFiles).length === 0} 
-                className="btn-primary py-2 px-6 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isUploading ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" /> Guardando en Drive...</>
-                ) : (
-                  <><Save className="w-4 h-4" /> Guardar Archivos ({Object.keys(selectedFiles).length})</>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
 
-function NavItem({ icon: Icon, label, active = false, onClick }: { icon: any, label: string, active?: boolean, onClick?: () => void }) {
+function NavItem({ icon: Icon, label, active = false, onClick }: { icon: LucideIcon, label: string, active?: boolean, onClick?: () => void }) {
   return (
     <button
       onClick={onClick}
@@ -987,14 +398,14 @@ function JugadoresView({ players, onSelectPlayer }: { players: Player[], onSelec
                       <div className="flex justify-between items-start">
                         <div>
                           <p className="font-bold text-slate-200 leading-tight">{p.Nombres || p.Nombre} {p.Apellido_Paterno || p.Apellidos}</p>
-                          <p className="text-xs font-mono text-slate-500 mt-1">{p.RUT}</p>
+                          <p className="text-xs font-mono text-slate-500 mt-1">{p.RUT}</p><Completeness player={p} />
                         </div>
                         <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider border whitespace-nowrap inline-flex items-center gap-1 ${
-                            p.Status_Validacion === 'Aprobado' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-                            p.Status_Validacion === 'Pendiente' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
+                            statusOf(p) === 'FEDERADO' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                            statusOf(p) === 'PENDIENTE' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
                             'bg-rose-500/10 text-rose-400 border-rose-500/20'
                         }`}>
-                          {p.Status_Validacion || 'Pendiente'}
+                          {statusOf(p)}
                         </span>
                       </div>
                       <div className="pt-3 border-t border-slate-800/50 flex flex-wrap items-center justify-between gap-y-2">
@@ -1097,7 +508,7 @@ function ValidacionesView({ players, onSelectPlayer }: { players: Player[], onSe
                 <tr key={i} onClick={() => onSelectPlayer(player)} className="hover:bg-slate-900/50 transition-colors cursor-pointer group">
                   <td className="px-6 py-4">
                     <div className="font-medium text-slate-200">{player.Nombres || player.Nombre} {player.Apellido_Paterno || player.Apellidos}</div>
-                    <div className="text-xs text-slate-500 font-mono mt-0.5">{player.RUT}</div>
+                    <div className="text-xs text-slate-500 font-mono mt-0.5">{player.RUT}</div><Completeness player={player} />
                   </td>
                   <td className="px-6 py-4">
                     <span className="text-sm text-slate-300 bg-slate-800/50 px-2 py-1 rounded-md border border-slate-700/50 whitespace-nowrap">{player.Serie}</span>
@@ -1146,7 +557,8 @@ function ExportModal({ players, onClose }: { players: Player[], onClose: () => v
      const BOM = "\uFEFF";
      const header = selectedFields.join(";");
      const rows = players.map(p => selectedFields.map(f => {
-       const val = p[f as keyof Player] || "";
+       const raw = p[f as keyof Player] || "";
+       const val = /^[=+@\-]/.test(raw) ? "'" + raw : raw;
        // Envolver en comillas y reemplazar comillas internas
        return `"${val.toString().replace(/"/g, '""')}"`;
      }).join(";"));
@@ -1161,6 +573,7 @@ function ExportModal({ players, onClose }: { players: Player[], onClose: () => v
      document.body.appendChild(link);
      link.click();
      document.body.removeChild(link);
+     setTimeout(() => URL.revokeObjectURL(url), 1000);
      onClose();
    };
 
@@ -1228,7 +641,7 @@ function ImportModal({ onClose, onRefresh }: { onClose: () => void, onRefresh: (
         const columns = rows[i].split(new RegExp(`\\s*${separator}\\s*(?=(?:[^"]*"[^"]*")*[^"]*$)`)).map(c => c.replace(/^"|"$/g, '').trim());
         if (!columns[rutIndex]) continue;
         
-        let obj: any = {};
+        const obj: Record<string, string> = {};
         headers.forEach((h, idx) => {
           obj[h] = columns[idx] || "";
         });
@@ -1245,14 +658,14 @@ function ImportModal({ onClose, onRefresh }: { onClose: () => void, onRefresh: (
 
       const result = await res.json();
       if (result.success) {
-        alert(`¡Se importaron ${playersToUpload.length} jugadores con éxito!`);
+        alert(`Se importaron ${result.created ?? playersToUpload.length} jugadores. ${result.skipped || 0} ya estaban inscritos.`);
         onRefresh();
         onClose();
       } else {
         alert("Error de Apps Script: " + result.error);
       }
-    } catch(err: any) {
-       alert("Error procesando el archivo: " + err.message);
+    } catch(err: unknown) {
+       alert("Error procesando el archivo: " + (err instanceof Error ? err.message : "Formato inválido"));
     } finally {
       setIsUploading(false);
     }
@@ -1271,7 +684,7 @@ function ImportModal({ onClose, onRefresh }: { onClose: () => void, onRefresh: (
         
         <div className="p-6 space-y-6">
           <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl">
-            <p className="text-sm text-blue-300 mb-3"><strong>Paso 1:</strong> Descarga la plantilla oficial. Rellénala en Excel y asegúrate de guardarla como <strong>"CSV (delimitado por comas)"</strong>.</p>
+            <p className="text-sm text-blue-300 mb-3"><strong>Paso 1:</strong> Descarga la plantilla oficial. Rellénala en Excel y asegúrate de guardarla como <strong>CSV (delimitado por comas)</strong>.</p>
             <button onClick={downloadTemplate} className="w-full bg-blue-600/20 hover:bg-blue-600/40 border border-blue-500/50 text-blue-400 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-colors">
               <Download className="w-4 h-4" /> Descargar Plantilla CSV
             </button>
@@ -1304,3 +717,8 @@ function ImportModal({ onClose, onRefresh }: { onClose: () => void, onRefresh: (
 
 // Boton de Navegación Inferior agregado directamente en Dashboard
 // y cerrado de div principal.
+
+function Completeness({ player }: { player: Player }) {
+  const missing = missingRequirements(player);
+  return <p className={`text-xs mt-2 ${missing.length ? 'text-amber-400' : 'text-green-400'}`} title={missing.join(', ')}>{missing.length ? `${missing.length} requisitos pendientes` : 'Ficha completa'}</p>;
+}
