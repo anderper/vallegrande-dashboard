@@ -14,7 +14,9 @@ export async function buildRegistrationPdf(player: Player, load: AttachmentLoade
   pdf.setAuthor('Club Deportivo Valle Grande FC');
   const regular = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
-  const leagueLogo = await pdf.embedJpg(readFileSync(join(process.cwd(), 'public', 'liga-lampa.jpg')));
+  // pdf-lib reads the underlying ArrayBuffer from offset zero. Copy pooled Node
+  // buffers so the JPEG header is at zero in every runtime, including Vercel.
+  const leagueLogo = await pdf.embedJpg(new Uint8Array(readFileSync(join(process.cwd(), 'public', 'liga-lampa.jpg'))));
   const cache = new Map<DocumentField, Attachment>();
   async function attachment(field: DocumentField) {
     if (!cache.has(field)) cache.set(field, await load(field));

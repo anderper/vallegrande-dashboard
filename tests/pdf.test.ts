@@ -1,11 +1,28 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import fs from 'node:fs';
 import { join } from 'node:path';
 import { PDFDocument } from 'pdf-lib';
 import { buildRegistrationPdf } from '../src/lib/registration-pdf';
 import { pdfFixture } from './pdf-fixtures';
 import { guardianAuthorization, playerAuthorization } from '../src/lib/registration';
+
+test('genera la ficha cuando Node entrega el logo en un buffer con desplazamiento', async context => {
+  const { player, load } = await pdfFixture();
+  const originalRead = fs.readFileSync;
+  context.mock.method(fs, 'readFileSync', (path: unknown, ...options: unknown[]) => {
+    const value = Reflect.apply(originalRead, fs, [path, ...options]);
+    if (String(path).endsWith('liga-lampa.jpg')) {
+      const storage = Buffer.alloc(value.length + 64);
+      value.copy(storage, 32);
+      return storage.subarray(32, 32 + value.length);
+    }
+    return value;
+  });
+  const pdf = await PDFDocument.load(await buildRegistrationPdf(player, load));
+  assert.equal(pdf.getPageCount(), 3);
+});
 
 for (const minor of [false, true]) test(`genera expediente ${minor ? 'menor' : 'adulto'} con firma y anexos`, async () => {
   const { player, load } = await pdfFixture(minor);
