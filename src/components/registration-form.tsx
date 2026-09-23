@@ -1,9 +1,10 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
+import Image from 'next/image';
 import { CheckCircle2, Loader2 } from 'lucide-react';
 import { SignaturePad } from './signature-pad';
 import { PhotoCrop } from './photo-crop';
-import { apiPost, prepareImage, readDataUrl, uploadDataUrl, validateFile } from '@/lib/client-files';
+import { apiPost, prepareImage, readDataUrl, rotateImage, uploadDataUrl, validateFile } from '@/lib/client-files';
 import { AUTHORIZATION_VERSION, automaticStatus, guardianAuthorization, isMinor, localDate, missingRequirements, playerAuthorization, REGISTRATION_TYPES, type DocumentField, type Player } from '@/lib/registration';
 
 const SERIES = ['1ERA INFANTIL', '2DA INFANTIL', '3RA INFANTIL', '4TA INFANTIL', 'JUVENIL', '3RA ADULTA', '2DA ADULTA', '1ERA ADULTA', 'SENIOR', 'SUPER SENIOR', 'DORADOS', 'FEMENINA INFANTIL', 'FEMENINA ADULTA'];
@@ -13,6 +14,7 @@ const labels: Partial<Record<DocumentField, string>> = { Foto_Cedula_Frontal: 'C
 export function RegistrationForm({ initial, onSaved, admin = false }: { initial?: Player; onSaved?: (player: Player) => void; admin?: boolean }) {
   const [data, setData] = useState<Player>(() => ({ ...empty, ...initial, Fecha_Nacimiento: initial?.Fecha_Nacimiento?.slice(0, 10) || '', Fecha_Inscripcion: initial?.Fecha_Inscripcion?.slice(0, 10) || initial?.Fecha_Registro?.slice(0, 10) || localDate() }));
   const [assets, setAssets] = useState<Partial<Record<DocumentField, string>>>({});
+  const [previews, setPreviews] = useState<Partial<Record<DocumentField, string>>>({});
   const [cropSource, setCropSource] = useState('');
   const [signature, setSignature] = useState('');
   const [guardianSignature, setGuardianSignature] = useState('');
@@ -45,19 +47,43 @@ export function RegistrationForm({ initial, onSaved, admin = false }: { initial?
     if (!file) return;
     setProcessing(true); setError('');
     try {
-      const pdf = field === 'Antecedentes_PDF'; validateFile(file, pdf);
+      const pdf = field === 'Antecedentes_PDF' && file.type === 'application/pdf'; validateFile(file, pdf);
       const source = pdf ? await readDataUrl(file) : await prepareImage(file);
       setAssets(prev => ({ ...prev, [field]: source, ...(field === 'Foto_Cedula_Frontal' ? { Foto_Jugador: '' } : {}) }));
+      setPreviews(prev => ({ ...prev, [field]: pdf ? '' : source }));
       if (field === 'Foto_Cedula_Frontal') { setCropSource(source); setData(prev => ({ ...prev, Foto_Jugador: '' })); }
     } catch (err) { setError(err instanceof Error ? err.message : 'No se pudo leer el archivo.'); }
+    finally { setProcessing(false); }
+  }
+  async function viewOrRotate(field: DocumentField, degrees = 0) {
+    setProcessing(true); setError('');
+    try {
+      let source = assets[field] || previews[field];
+      if (!source) {
+        const response = await fetch(`/api/players/document?rut=${encodeURIComponent(initial!.RUT)}&field=${field}`);
+        if (!response.ok) { const result = await response.json(); throw new Error(result.error); }
+        const blob = await response.blob();
+        if (!blob.type.startsWith('image/')) throw new Error('Este documento no es una imagen.');
+        source = await readDataUrl(blob);
+      }
+      if (degrees) {
+        source = await rotateImage(source, degrees);
+        setAssets(prev => ({ ...prev, [field]: source }));
+        if (field === 'Foto_Cedula_Frontal' && cropSource) setCropSource(source);
+      }
+      setPreviews(prev => ({ ...prev, [field]: source }));
+    } catch (err) { setError(err instanceof Error ? err.message : 'No se pudo abrir la imagen.'); }
     finally { setProcessing(false); }
   }
   async function cropExisting() {
     setProcessing(true); setError('');
     try {
-      const response = await fetch(`/api/players/document?rut=${encodeURIComponent(initial!.RUT)}&field=Foto_Cedula_Frontal`);
-      if (!response.ok) { const result = await response.json(); throw new Error(result.error); }
-      const source = await readDataUrl(await response.blob());
+      let source = assets.Foto_Cedula_Frontal || previews.Foto_Cedula_Frontal;
+      if (!source) {
+        const response = await fetch(`/api/players/document?rut=${encodeURIComponent(initial!.RUT)}&field=Foto_Cedula_Frontal`);
+        if (!response.ok) { const result = await response.json(); throw new Error(result.error); }
+        source = await readDataUrl(await response.blob());
+      }
       setCropSource(source);
       setAssets(prev => ({ ...prev, Foto_Jugador: '' }));
       setData(prev => ({ ...prev, Foto_Jugador: '' }));
@@ -104,7 +130,16 @@ export function RegistrationForm({ initial, onSaved, admin = false }: { initial?
     finally { setBusy(false); setProgress(''); }
   }
   const input = (field: string, label: string, type = 'text', required = false) => <label className="block text-sm text-slate-300" key={field}>{label}{required && ' *'}<input aria-label={label} type={type} value={data[field] || ''} required={required} readOnly={field === 'RUT' && !!initial} maxLength={type === 'text' ? 180 : undefined} max={type === 'date' ? localDate() : undefined} onChange={e => change(field, e.target.value)} className="input-field w-full mt-1 read-only:opacity-60" /></label>;
-  const fileInput = (field: DocumentField) => <label key={field} className="block p-4 border border-slate-700 rounded-xl text-sm"><span className="block mb-2 font-medium">{labels[field]}</span><span className="block text-xs text-slate-400 mb-2">{assets[field] ? 'Archivo preparado' : data[field] ? 'Documento guardado. Puedes reemplazarlo.' : field === 'Antecedentes_PDF' ? 'PDF, hasta 2,5 MB' : 'JPG, PNG o WebP, hasta 10 MB'}</span><input aria-label={labels[field]} type="file" accept={field === 'Antecedentes_PDF' ? 'application/pdf' : 'image/jpeg,image/png,image/webp'} onChange={e => void selectFile(field, e.target.files?.[0])} className="block w-full text-xs file:rounded-lg file:border-0 file:bg-slate-700 file:text-white file:p-2 file:mr-2" /></label>;
+  const fileInput = (field: DocumentField) => <div key={field} className="p-4 border border-slate-700 rounded-xl text-sm space-y-3">
+    <label className="block"><span className="block mb-2 font-medium">{labels[field]}</span><span className="block text-xs text-slate-400 mb-2">{field === 'Antecedentes_PDF' ? 'PDF hasta 2,5 MB o imagen JPG, PNG o WebP hasta 10 MB.' : 'JPG, PNG o WebP, hasta 10 MB.'} {assets[field] ? 'Cambios preparados para guardar.' : data[field] ? 'Documento guardado. Puedes reemplazarlo.' : ''}</span><input aria-label={labels[field]} type="file" accept={`${field === 'Antecedentes_PDF' ? 'application/pdf,' : ''}image/jpeg,image/png,image/webp`} onChange={e => void selectFile(field, e.target.files?.[0])} className="block w-full text-xs file:rounded-lg file:border-0 file:bg-slate-700 file:text-white file:p-2 file:mr-2" /></label>
+    {previews[field] && <Image src={previews[field]} alt={`Vista previa: ${labels[field]}`} width={600} height={400} unoptimized className="w-full h-44 object-contain rounded-lg bg-slate-900" />}
+    {(previews[field] || (field !== 'Antecedentes_PDF' && data[field])) && <div className="flex flex-wrap gap-3">
+      {!previews[field] && <button type="button" onClick={() => void viewOrRotate(field)} className="text-brand-400 underline">Ver cédula</button>}
+      <button type="button" aria-label={`Girar ${labels[field]} a la izquierda`} onClick={() => void viewOrRotate(field, -90)} className="text-brand-400 underline">↶ Girar 90°</button>
+      <button type="button" aria-label={`Girar ${labels[field]} a la derecha`} onClick={() => void viewOrRotate(field, 90)} className="text-brand-400 underline">↷ Girar 90°</button>
+    </div>}
+    {assets[field] && previews[field] && <p className="text-xs text-slate-400">La orientación se aplicará a la ficha PDF al guardar.</p>}
+  </div>;
   if (success) return <div className="glass-card p-10 text-center space-y-4"><CheckCircle2 className="w-12 h-12 text-brand-400 mx-auto" /><h2 className="text-2xl font-bold">Inscripción guardada</h2><p className="text-slate-400">El club revisará la ficha y tramitará la inscripción en la liga.</p>{!admin && <button type="button" className="btn-primary mx-auto" onClick={() => window.location.reload()}>Registrar otro jugador</button>}</div>;
   return <form onSubmit={submit} className="space-y-6">
     {capable === false && <p role="status" className="rounded-xl bg-amber-500/10 border border-amber-500/30 p-4 text-sm text-amber-200">Las nuevas inscripciones estarán disponibles cuando el club termine de conectar el sistema. Tus datos aún no se han enviado.</p>}

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { PDFDocument } from 'pdf-lib';
 import { buildRegistrationPdf } from '../src/lib/registration-pdf';
@@ -20,6 +20,16 @@ for (const minor of [false, true]) test(`genera expediente ${minor ? 'menor' : '
 test('conserva todas las páginas de certificados multipágina', async () => {
   const { player, load } = await pdfFixture(false, 3);
   assert.equal((await PDFDocument.load(await buildRegistrationPdf(player, load))).getPageCount(), 5);
+});
+
+for (const extension of ['png', 'jpg']) test(`incluye antecedentes guardados como imagen ${extension} sin recortarlos`, async () => {
+  const { player, load } = await pdfFixture();
+  const bytes = await buildRegistrationPdf(player, async field => field === 'Antecedentes_PDF'
+    ? { bytes: new Uint8Array(readFileSync(`tests/fixtures/antecedentes.${extension}`)), mimeType: extension === 'png' ? 'image/png' : 'image/jpeg' } : load(field));
+  const parsed = await PDFDocument.load(bytes);
+  assert.equal(parsed.getPageCount(), 3);
+  assert.equal(parsed.getPage(2).getWidth(), 595.28);
+  if (process.env.PDF_OUTPUT_DIR) writeFileSync(join(process.env.PDF_OUTPUT_DIR, `antecedentes-${extension}-prueba.pdf`), bytes);
 });
 test('autorizaciones largas continúan en otra página para no cortar las firmas', async () => {
   const { player, load } = await pdfFixture(true);

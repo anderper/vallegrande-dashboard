@@ -34,6 +34,18 @@ export async function prepareImage(file: File) {
   context.drawImage(img, 0, 0, canvas.width, canvas.height);
   return canvas.toDataURL('image/jpeg', 0.88);
 }
+export async function rotateImage(source: string, degrees: number) {
+  const img = await loadImage(source);
+  const canvas = document.createElement('canvas');
+  canvas.width = img.height; canvas.height = img.width;
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('Tu navegador no permite girar imágenes.');
+  context.fillStyle = '#fff'; context.fillRect(0, 0, canvas.width, canvas.height);
+  context.translate(canvas.width / 2, canvas.height / 2);
+  context.rotate(degrees * Math.PI / 180);
+  context.drawImage(img, -img.width / 2, -img.height / 2);
+  return canvas.toDataURL('image/jpeg', 0.95);
+}
 export async function apiPost(body: Record<string, unknown>) {
   const response = await fetch('/api/players', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   const data = await response.json();

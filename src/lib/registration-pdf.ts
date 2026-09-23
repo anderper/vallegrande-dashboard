@@ -102,12 +102,17 @@ export async function buildRegistrationPdf(player: Player, load: AttachmentLoade
   text(authorizationPage, `Autorización registrada: ${date(player.Fecha_Firma)} | ${player.Autorizacion_Version}`, 45, 796, 8);
 
   const certificate = await attachment('Antecedentes_PDF');
-  if (certificate.mimeType !== 'application/pdf') throw new Error('El certificado de antecedentes debe ser un PDF.');
+  if (['image/png', 'image/jpeg'].includes(certificate.mimeType)) {
+    const certificatePage = pdf.addPage([595.28, 841.89]);
+    header(certificatePage, 'CERTIFICADO DE ANTECEDENTES');
+    await picture(certificatePage, 'Antecedentes_PDF', 45, 140, 505, 656);
+  } else if (certificate.mimeType === 'application/pdf') {
   let attached;
   try { attached = await PDFDocument.load(certificate.bytes); }
   catch { throw new Error('No se pudo abrir el certificado PDF. Comprueba que no esté dañado ni protegido con contraseña.'); }
   if (attached.getPageCount() < 1 || attached.getPageCount() > 20) throw new Error('El certificado debe contener entre 1 y 20 páginas.');
   for (const copied of await pdf.copyPages(attached, attached.getPageIndices())) pdf.addPage(copied);
+  } else throw new Error('El certificado de antecedentes debe ser PDF o imagen JPG o PNG.');
 
   if (isMinor(player)) {
     const guardian = pdf.addPage([595.28, 841.89]);

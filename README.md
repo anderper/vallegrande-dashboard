@@ -8,6 +8,7 @@ Aplicación para inscripciones y expedientes de jugadores de la Liga Comunal Lam
 - Autorización del jugador y, para menores, datos, documentos y firma del apoderado.
 - Dashboard: faltantes por jugador, edición de ficha, tipo de trámite y estado manual Pendiente / Por federar / Federado.
 - PDF con ficha, foto, firma, autorización, ambas caras de la cédula y certificado de antecedentes completo.
+- Giro de ambas caras de las cédulas, nuevas o guardadas, antes de guardar la ficha. Antecedentes en PDF, JPG o PNG; las nuevas imágenes WebP se convierten a JPG.
 - Importación y exportación CSV existentes.
 
 ## Desarrollo
