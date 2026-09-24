@@ -27,10 +27,16 @@ test('espacios accidentales no invalidan la firma cuando Sheets normaliza los ca
 });
 test('menores requieren autorización firmada y documentos del apoderado', () => {
   const p: Player = { ...complete(), Fecha_Nacimiento: '2012-01-01', Tipo_Inscripcion: 'INSC INF/JUV' };
+  delete p.Antecedentes_PDF;
   assert.equal(missingRequirements(p).length, 4);
   Object.assign(p, { Nombre_Apoderado: 'Apoderado de prueba', RUT_Apoderado: '12.345.678-5', Foto_Cedula_Padre_Frontal: 'yes', Foto_Cedula_Padre_Reverso: 'yes', Firma_Apoderado: 'yes', Fecha_Firma_Apoderado: '2026-09-23' });
   p.Autorizacion_Apoderado_Texto = guardianAuthorization(p);
   assert.deepEqual(missingRequirements(p), []);
+  assert.equal(automaticStatus(p), 'POR FEDERAR');
+  for (const field of ['Foto_Cedula_Frontal','Foto_Cedula_Reverso','Firma_Jugador','Foto_Cedula_Padre_Frontal','Foto_Cedula_Padre_Reverso','Firma_Apoderado']) {
+    assert.ok(missingRequirements({ ...p, [field]: '' }).length > 0, field);
+  }
+  assert.ok(missingRequirements({ ...p, Fecha_Nacimiento: '2000-01-01' }).includes('Certificado de antecedentes'));
 });
 test('Apps Script añade columnas sin borrar filas y guarda nuevos campos por encabezado', () => {
   const harness = createScriptHarness([['Nombres', 'RUT', 'Columna_Personalizada'], ['Anterior', '9.876.543-3', 'NO CAMBIAR']]);

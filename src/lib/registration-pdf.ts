@@ -101,7 +101,7 @@ export async function buildRegistrationPdf(player: Player, load: AttachmentLoade
     if (player.Tipo_Inscripcion === option.type) text(page, 'X', option.box + 4, option.top + 4, 10, bold);
   }
   originalSection('DOCUMENTACIÓN', 566);
-  [{ label: 'CÉDULA DE IDENTIDAD', x: 60, box: 180, checked: true }, { label: 'CERTIFICADO ANTEC.', x: 232, box: 344, checked: true }, { label: 'AUTORIZACIÓN TUTOR', x: 391, box: 507, checked: isMinor(player) }].forEach(item => {
+  [{ label: 'CÉDULA DE IDENTIDAD', x: 60, box: 180, checked: true }, { label: isMinor(player) ? 'ANTECEDENTES: NO APLICA' : 'CERTIFICADO ANTEC.', x: 232, box: 344, checked: !isMinor(player) }, { label: 'AUTORIZACIÓN TUTOR', x: 391, box: 507, checked: isMinor(player) }].forEach(item => {
     text(page, item.label, item.x, 599, 8, regular, item.box - item.x - 5);
     page.drawRectangle({ x: item.box, y: page.getHeight() - 613, width: 27, height: 21, borderWidth: 0.6, color: rgb(1, 1, 1) });
     if (item.checked) text(page, 'X', item.box + 10, 596, 10);
@@ -123,6 +123,7 @@ export async function buildRegistrationPdf(player: Player, load: AttachmentLoade
   line(authorizationPage, 190, after + 61, 210); text(authorizationPage, 'Firma del jugador', 245, after + 66, 9);
   text(authorizationPage, `Autorización registrada: ${date(player.Fecha_Firma)} | ${player.Autorizacion_Version}`, 45, 796, 8);
 
+  if (!isMinor(player)) {
   const certificate = await attachment('Antecedentes_PDF');
   if (['image/png', 'image/jpeg'].includes(certificate.mimeType)) {
     const certificatePage = pdf.addPage([595.28, 841.89]);
@@ -135,6 +136,8 @@ export async function buildRegistrationPdf(player: Player, load: AttachmentLoade
   if (attached.getPageCount() < 1 || attached.getPageCount() > 20) throw new Error('El certificado debe contener entre 1 y 20 páginas.');
   for (const copied of await pdf.copyPages(attached, attached.getPageIndices())) pdf.addPage(copied);
   } else throw new Error('El certificado de antecedentes debe ser PDF o imagen JPG o PNG.');
+
+  }
 
   if (isMinor(player)) {
     const guardian = pdf.addPage([595.28, 841.89]);

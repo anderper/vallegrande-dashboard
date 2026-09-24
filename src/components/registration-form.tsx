@@ -94,6 +94,7 @@ export function RegistrationForm({ initial, onSaved, admin = false }: { initial?
     event.preventDefault(); setError('');
     if (!capable) { setError('La conexión de inscripciones todavía no está lista. Contacta al club.'); return; }
     const prepared: Player = { ...data, ...assets };
+    if (minor) prepared.Antecedentes_PDF = data.Antecedentes_PDF || '';
     if (!admin && !prepared.Tipo_Inscripcion) prepared.Tipo_Inscripcion = minor ? 'INSC INF/JUV' : 'INSC ADULTO';
     if (signature) {
       if (!consent) { setError('Acepta la autorización del jugador antes de guardar.'); return; }
@@ -110,6 +111,7 @@ export function RegistrationForm({ initial, onSaved, admin = false }: { initial?
     setBusy(true);
     try {
       const pending: Partial<Record<DocumentField, string>> = { ...assets, ...(signature ? { Firma_Jugador: signature } : {}), ...(minor && guardianSignature ? { Firma_Apoderado: guardianSignature } : {}) };
+      if (minor) delete pending.Antecedentes_PDF;
       for (const [field, source] of Object.entries(pending)) {
         if (!source) continue;
         setProgress(`Guardando ${labels[field as DocumentField] || (field.includes('Firma') ? 'firma' : 'foto recortada')}…`);
@@ -150,11 +152,11 @@ export function RegistrationForm({ initial, onSaved, admin = false }: { initial?
         {input('WhatsApp', 'WhatsApp', 'tel')}{input('Direccion', 'Dirección')}
         {admin && <label className="text-sm text-slate-300">Tipo de inscripción<select aria-label="Tipo de inscripción" value={data.Tipo_Inscripcion || ''} onChange={e => change('Tipo_Inscripcion', e.target.value)} className="input-field w-full mt-1"><option value="">Seleccionar trámite</option>{REGISTRATION_TYPES.map(t => <option key={t}>{t}</option>)}</select></label>}
       </div></section>
-      <section className="glass-card p-5 sm:p-7 space-y-5"><h2 className="font-bold text-lg">2. Documentos y foto</h2><div className="grid sm:grid-cols-2 gap-4">{fileInput('Foto_Cedula_Frontal')}{fileInput('Foto_Cedula_Reverso')}{fileInput('Antecedentes_PDF')}</div>
+      <section className="glass-card p-5 sm:p-7 space-y-5"><h2 className="font-bold text-lg">2. Documentos y foto</h2><div className="grid sm:grid-cols-2 gap-4">{fileInput('Foto_Cedula_Frontal')}{fileInput('Foto_Cedula_Reverso')}{!minor && fileInput('Antecedentes_PDF')}</div>
         {cropSource ? <PhotoCrop key={cropSource} source={cropSource} onConfirm={value => setAssets(prev => ({ ...prev, Foto_Jugador: value }))} disabled={busy || processing} /> : data.Foto_Cedula_Frontal && <button type="button" onClick={() => void cropExisting()} className="btn-primary">{data.Foto_Jugador ? 'Ajustar foto desde la cédula' : 'Recortar foto desde la cédula guardada'}</button>}
         {!data.Foto_Cedula_Frontal && !assets.Foto_Cedula_Frontal && <p className="text-sm text-slate-400">Al adjuntar la cédula frontal podrás recortar la foto para la ficha.</p>}
       </section>
-      {minor && <section className="glass-card p-5 sm:p-7 space-y-5"><h2 className="font-bold text-lg">Apoderado del menor de edad</h2><div className="grid sm:grid-cols-2 gap-4">{input('Nombre_Apoderado', 'Nombre completo del apoderado', 'text', !admin)}{input('RUT_Apoderado', 'RUT del apoderado', 'text', !admin)}{fileInput('Foto_Cedula_Padre_Frontal')}{fileInput('Foto_Cedula_Padre_Reverso')}</div><p className="text-sm text-slate-300 leading-relaxed">{guardianText}</p>
+      {minor && <section className="glass-card p-5 sm:p-7 space-y-5"><h2 className="font-bold text-lg">Apoderado del menor de edad</h2><p className="text-sm text-slate-400">Los menores no necesitan certificado de antecedentes. Adjunta ambas caras de la cédula del jugador y del apoderado, y registra la firma de ambos.</p><div className="grid sm:grid-cols-2 gap-4">{input('Nombre_Apoderado', 'Nombre completo del apoderado', 'text', !admin)}{input('RUT_Apoderado', 'RUT del apoderado', 'text', !admin)}{fileInput('Foto_Cedula_Padre_Frontal')}{fileInput('Foto_Cedula_Padre_Reverso')}</div><p className="text-sm text-slate-300 leading-relaxed">{guardianText}</p>
         {existingGuardianSignature && !guardianSignature && <p className="text-sm text-brand-400">Autorización y firma del apoderado guardadas.</p>}
         <label className="flex gap-3 text-sm"><input type="checkbox" checked={guardianConsent} onChange={e => setGuardianConsent(e.target.checked)} className="accent-green-500" />Soy el apoderado y acepto esta autorización.</label>
         <SignaturePad key={guardianText} label="Firma del apoderado" onChange={setGuardianSignature} disabled={busy || processing} />

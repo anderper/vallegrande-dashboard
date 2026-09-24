@@ -54,7 +54,7 @@ export function requirements(p: Player) {
     { key: 'Tipo_Inscripcion', label: 'Tipo de inscripción', complete: REGISTRATION_TYPES.includes(p.Tipo_Inscripcion as typeof REGISTRATION_TYPES[number]) },
     { key: 'Foto_Cedula_Frontal', label: 'Cédula frontal', complete: !!p.Foto_Cedula_Frontal },
     { key: 'Foto_Cedula_Reverso', label: 'Cédula reverso', complete: !!p.Foto_Cedula_Reverso },
-    { key: 'Antecedentes_PDF', label: 'Certificado de antecedentes', complete: !!p.Antecedentes_PDF },
+    ...(!isMinor(p) ? [{ key: 'Antecedentes_PDF', label: 'Certificado de antecedentes', complete: !!p.Antecedentes_PDF }] : []),
     { key: 'Foto_Jugador', label: 'Foto recortada de la cédula', complete: !!p.Foto_Jugador },
     { key: 'Firma_Jugador', label: 'Firma y autorización del jugador', complete: !!p.Firma_Jugador && !!p.Fecha_Firma && p.Autorizacion_Texto === playerAuthorization(p) && p.Autorizacion_Version === AUTHORIZATION_VERSION },
   ];

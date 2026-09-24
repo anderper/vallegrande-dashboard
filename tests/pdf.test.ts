@@ -29,7 +29,7 @@ for (const minor of [false, true]) test(`genera expediente ${minor ? 'menor' : '
   const originalStatus = player.Status_Validacion;
   const bytes = await buildRegistrationPdf(player, load);
   const parsed = await PDFDocument.load(bytes);
-  assert.equal(parsed.getPageCount(), minor ? 4 : 3);
+  assert.equal(parsed.getPageCount(), 3);
   assert.equal(player.Status_Validacion, originalStatus);
   assert.match(parsed.getTitle() || '', /JUGADOR/);
   if (process.env.PDF_OUTPUT_DIR) { mkdirSync(process.env.PDF_OUTPUT_DIR, { recursive: true }); writeFileSync(join(process.env.PDF_OUTPUT_DIR, `ficha-${minor ? 'menor' : 'adulto'}-prueba.pdf`), bytes); }
@@ -37,6 +37,16 @@ for (const minor of [false, true]) test(`genera expediente ${minor ? 'menor' : '
 test('conserva todas las páginas de certificados multipágina', async () => {
   const { player, load } = await pdfFixture(false, 3);
   assert.equal((await PDFDocument.load(await buildRegistrationPdf(player, load))).getPageCount(), 5);
+});
+test('menor genera ficha sin consultar antecedentes, incluso si tiene un enlace antiguo', async () => {
+  const { player, load } = await pdfFixture(true);
+  for (const antecedente of ['', player.Antecedentes_PDF]) {
+    const bytes = await buildRegistrationPdf({ ...player, Antecedentes_PDF: antecedente }, async field => {
+      assert.notEqual(field, 'Antecedentes_PDF');
+      return load(field);
+    });
+    assert.equal((await PDFDocument.load(bytes)).getPageCount(), 3);
+  }
 });
 
 for (const extension of ['png', 'jpg']) test(`incluye antecedentes guardados como imagen ${extension} sin recortarlos`, async () => {
@@ -55,7 +65,7 @@ test('autorizaciones largas continúan en otra página para no cortar las firmas
   player.Apellido_Materno = 'Apellido '.repeat(18).trim();
   player.Nombre_Apoderado = 'Apoderado '.repeat(18).trim();
   player.Autorizacion_Texto = playerAuthorization(player); player.Autorizacion_Apoderado_Texto = guardianAuthorization(player);
-  assert.equal((await PDFDocument.load(await buildRegistrationPdf(player, load))).getPageCount(), 6);
+  assert.equal((await PDFDocument.load(await buildRegistrationPdf(player, load))).getPageCount(), 5);
 });
 test('no produce un expediente engañosamente completo si falta firma o falla un anexo', async () => {
   const { player, load } = await pdfFixture();
