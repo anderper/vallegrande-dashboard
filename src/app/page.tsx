@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { RegistrationForm } from "@/components/registration-form";
 import { PlayerDossier } from "@/components/player-dossier";
+import { LogoutButton } from "@/components/logout-button";
 import { missingRequirements, normalizePlayer, normalizeRut, statusOf, type Player } from "@/lib/registration";
 import Image from "next/image";
 import type { LucideIcon } from "lucide-react";
@@ -147,7 +148,7 @@ export default function Dashboard() {
             </div>
           </div>
           
-          <p className="text-slate-400 mt-1 hidden md:block">Inscripciones y fichas para la liga.</p>
+          <LogoutButton />
 
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
             {currentView === 'dashboard' && (

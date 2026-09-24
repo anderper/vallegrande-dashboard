@@ -1,9 +1,11 @@
 import { documentBytes, errorResponse, findPlayer, ServiceError } from '@/lib/google-script';
 import { DOCUMENT_FIELDS, type DocumentField } from '@/lib/registration';
+import { requireAdmin } from '@/lib/admin-auth';
 
 export const runtime = 'nodejs';
 export async function GET(request: Request) {
   try {
+    requireAdmin(request);
     const url = new URL(request.url);
     const field = url.searchParams.get('field') as DocumentField;
     if (!DOCUMENT_FIELDS.includes(field)) throw new ServiceError('Documento no permitido.', 400);

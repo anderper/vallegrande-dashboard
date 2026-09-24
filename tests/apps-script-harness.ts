@@ -1,7 +1,7 @@
 import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
 
-export function createScriptHarness(initial?: string[][]) {
+export function createScriptHarness(initial?: string[][], apiToken?: string) {
   const rows: string[][] = initial || [['ID_Jugador', 'RUT', 'Nombres', 'Observaciones']];
   const files = new Map<string, { bytes: number[]; type: string }>();
   let sequence = 0;
@@ -22,7 +22,7 @@ export function createScriptHarness(initial?: string[][]) {
     ContentService: { MimeType: { JSON: 'application/json' }, createTextOutput: (content: string) => ({ setMimeType: () => content }) },
     SpreadsheetApp: { getActiveSpreadsheet: () => ({ getSheetByName: (name: string) => name === 'Jugadores' ? sheet : null, getSpreadsheetTimeZone: () => 'America/Santiago' }) },
     LockService: { getScriptLock: () => ({ waitLock: () => {}, hasLock: () => true, releaseLock: () => {} }) },
-    PropertiesService: { getScriptProperties: () => ({ getProperty: () => null }) },
+    PropertiesService: { getScriptProperties: () => ({ getProperty: () => apiToken || null }) },
     Utilities: { getUuid: () => `test-id-${++sequence}`, formatDate: (date: Date) => date.toISOString().slice(0, 10), base64Decode: (value: string) => [...Buffer.from(value, 'base64')], base64Encode: (value: number[]) => Buffer.from(value).toString('base64'), newBlob: blob },
     DriveApp: { getFoldersByName: () => ({ hasNext: () => true, next: () => folder }), createFolder: () => folder, getFileById: (id: string) => { const file = files.get(id); if (!file) throw new Error('Archivo no encontrado.'); return { getSize: () => file.bytes.length, getBlob: () => blob(file.bytes, file.type) }; } },
   });

@@ -1,11 +1,13 @@
 import { buildRegistrationPdf } from '@/lib/registration-pdf';
 import { documentBytes, errorResponse, findPlayer, ServiceError } from '@/lib/google-script';
 import { missingRequirements, normalizeRut } from '@/lib/registration';
+import { requireAdmin } from '@/lib/admin-auth';
 
 export const runtime = 'nodejs';
 export const maxDuration = 120;
 export async function GET(request: Request) {
   try {
+    requireAdmin(request);
     const player = await findPlayer(new URL(request.url).searchParams.get('rut') || '');
     const missing = missingRequirements(player);
     if (missing.length) throw new ServiceError(`Falta completar: ${missing.join(', ')}.`, 422);

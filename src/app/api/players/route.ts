@@ -1,5 +1,6 @@
 import { automaticStatus, DOCUMENT_FIELDS, missingRequirements, normalizePlayer, STATUSES, statusOf } from '@/lib/registration';
 import { driveFileId, errorResponse, findPlayer, listPlayers, requireRegistrationBackend, scriptRequest, ServiceError } from '@/lib/google-script';
+import { isAdmin, requireAdmin, requireSameOrigin } from '@/lib/admin-auth';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -9,18 +10,22 @@ export async function GET(request: Request) {
       await requireRegistrationBackend();
       return Response.json({ registrationVersion: 1 });
     }
+    requireAdmin(request);
     return Response.json(await listPlayers(), { headers: { 'Cache-Control': 'private, no-store' } });
   } catch (error) { return errorResponse(error); }
 }
 
 export async function POST(request: Request) {
   try {
+    requireSameOrigin(request);
     if (Number(request.headers.get('content-length')) > 3.8 * 1024 * 1024) throw new ServiceError('El archivo supera el tamaño permitido.', 413);
     const text = await request.text();
     if (text.length > 3.8 * 1024 * 1024) throw new ServiceError('La solicitud supera el tamaño permitido.', 413);
     let body;
     try { body = JSON.parse(text); } catch { throw new ServiceError('La solicitud no contiene JSON válido.', 400); }
     if (!body || typeof body !== 'object') throw new ServiceError('Solicitud inválida.', 400);
+    const admin = isAdmin(request);
+    if (!['UPLOAD_FILE', 'CREATE_REGISTRATION'].includes(body.action)) requireAdmin(request);
     await requireRegistrationBackend();
     if (body.action === 'UPLOAD_FILE') {
       if (!['image/jpeg', 'image/png', 'application/pdf'].includes(body.mimeType) || typeof body.fileData !== 'string' || !/^[A-Za-z0-9+/]+={0,2}$/.test(body.fileData)) throw new ServiceError('Formato de archivo no admitido.', 400);
@@ -41,10 +46,11 @@ export async function POST(request: Request) {
       if (existing && existing.RUT !== player.RUT) throw new ServiceError('No se puede cambiar el RUT de un registro existente.', 400);
       player.Status_Validacion = existing ? statusOf(existing) : 'PENDIENTE';
       player.Status_Validacion = automaticStatus(player);
-      if (body.complete && missingRequirements(player).length) throw new ServiceError(`Falta completar: ${missingRequirements(player).join(', ')}.`, 400);
+      if ((!admin || body.complete) && missingRequirements(player).length) throw new ServiceError(`Falta completar: ${missingRequirements(player).join(', ')}.`, 400);
       const result = await scriptRequest({ action: body.action, player, originalRut: body.originalRut, requestId: typeof body.requestId === 'string' ? body.requestId.slice(0, 80) : undefined });
       if (!result || typeof result !== 'object' || !('player' in result)) throw new ServiceError('No se pudo verificar que la ficha quedó guardada.');
-      return Response.json(result);
+      // Public retries must never reveal the stored dossier or document links.
+      return Response.json(admin ? result : { success: true });
     }
     if (body.action === 'UPDATE_STATUS') {
       if (!STATUSES.includes(body.status)) throw new ServiceError('Estado inválido.', 400);

@@ -42,6 +42,6 @@ Las pruebas ejercitan el mismo `Code.gs` con un simulador de Sheets/Drive, verif
 
 ## Límites actuales
 
-El proyecto mantiene el modelo de acceso administrativo anterior, sin inicio de sesión. El token opcional entre Next.js y Apps Script no autentica a los usuarios del dashboard. Implementar acceso de dirigentes es una tarea pendiente antes de restringir el acceso a información personal.
+El dashboard requiere una clave compartida de dirigentes y sesión de 8 horas; `/registro` sigue público. Configurar `ADMIN_PASSWORD` en Vercel y el token entre Next.js y Apps Script siguiendo [ADMIN_ACCESS.md](ADMIN_ACCESS.md). La protección completa exige activar `API_TOKEN` en Apps Script para impedir el acceso directo a su URL. No incluir claves en Git.
 
 La firma del club y el espacio de la liga permanecen en blanco para su gestión posterior. Los documentos históricos con enlaces públicos conservan sus permisos; los nuevos archivos no se publican individualmente mediante Drive.
