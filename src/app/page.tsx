@@ -156,7 +156,7 @@ export default function Dashboard() {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                 <input
                   type="text"
-                  placeholder="Buscar por RUT o Nombre..."
+                  placeholder="Buscar por RUT, ID o nombre..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="input-field pl-10 pr-4 py-2 w-full md:w-64 text-sm md:text-base"

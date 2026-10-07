@@ -57,3 +57,22 @@ test('reintento idempotente no duplica jugador y actualización preserva otros c
 test('lectura de Drive solo permite documentos referenciados por el jugador', () => {
   const h = createScriptHarness(); assert.equal(h.post({ action: 'GET_FILE', RUT: '123456785', field: 'fileId' }).success, false);
 });
+
+
+test('nacionalidad extranjera acepta ID alfanumérico y conserva autorizaciones históricas', async () => {
+  const { identificationLabel, validPlayerId, isForeignPlayer } = await import('../src/lib/registration');
+  for (const country of ['Chile', ' CHILENA ', 'chileno', 'CL', 'CHL']) {
+    assert.equal(isForeignPlayer({ Nacionalidad: country }), false);
+    assert.equal(validPlayerId({ Nacionalidad: country, RUT: 'AB123456' }), false);
+  }
+  const p = { ...complete(), Nacionalidad: 'Venezolana', RUT: 'AB123456' };
+  p.Autorizacion_Texto = playerAuthorization(p);
+  assert.equal(identificationLabel(p), 'ID');
+  assert.match(p.Autorizacion_Texto, /con ID AB123456/);
+  assert.deepEqual(missingRequirements(p), []);
+  for (const id of ['ABC123', '1234567', 'AB-123.45', '001ABC']) assert.ok(validPlayerId({ ...p, RUT: id }));
+  for (const id of ['', '!!!', 'a'.repeat(41), 'ID/123']) assert.equal(validPlayerId({ ...p, RUT: id }), false);
+  p.Autorizacion_Texto = playerAuthorization({ ...p, Nacionalidad: 'CHILENA' });
+  assert.deepEqual(missingRequirements(p), []);
+  assert.ok(missingRequirements({ ...p, RUT: 'OTHER123' }).includes('Firma y autorización del jugador'));
+});

@@ -65,3 +65,24 @@ test('API rechaza archivos falsos, acciones desconocidas e inscripción incomple
   assert.equal((await POST(request({ action: 'UPLOAD_FILE', fileData: 'AAAA', mimeType: 'image/png' }))).status, 400);
   assert.equal((await POST(request({ action: 'CREATE_REGISTRATION', player: { RUT: '12345678-5', Nombres: 'Prueba' }, complete: true }))).status, 400);
 });
+
+
+test('extranjero se inscribe con ID, se recupera y genera PDF usando Apps Script sin migración', async () => {
+  const { player, load } = await pdfFixture();
+  player.RUT = 'VEABC123456'; player.Nacionalidad = 'VENEZOLANA';
+  const { playerAuthorization } = await import('../src/lib/registration');
+  player.Autorizacion_Texto = playerAuthorization(player);
+  for (const field of DOCUMENT_FIELDS) {
+    if (!player[field]) continue;
+    const file = await load(field);
+    const response = await POST(request({ action: 'UPLOAD_FILE', mimeType: file.mimeType, fileData: Buffer.from(file.bytes).toString('base64'), fileName: field }, false));
+    assert.equal(response.status, 200); player[field] = (await response.json()).url;
+  }
+  const created = await POST(request({ action: 'CREATE_REGISTRATION', player, complete: true, requestId: 'foreign-player' }, false));
+  assert.equal(created.status, 200);
+  const pdf = await pdfGET(new Request('http://localhost/api/players/ficha?rut=VEABC123456', { headers: adminHeaders() }));
+  assert.equal(pdf.status, 200);
+  assert.equal((await PDFDocument.load(await pdf.arrayBuffer())).getPageCount(), 3);
+  const changed = await POST(request({ action: 'UPDATE_STATUS', RUT: 'veabc123456', status: 'POR FEDERAR' }));
+  assert.equal(changed.status, 200);
+});

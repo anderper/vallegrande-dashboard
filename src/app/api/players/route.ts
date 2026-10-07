@@ -40,7 +40,7 @@ export async function POST(request: Request) {
       if (Object.values(body.player).some(v => typeof v !== 'string' || v.length > 2500)) throw new ServiceError('Hay campos inválidos o demasiado largos.', 400);
       const player = normalizePlayer(body.player);
       for (const field of ['Nombres', 'Apellido_Paterno', 'Apellido_Materno', 'Nombre_Apoderado', 'Nacionalidad', 'Serie']) if (player[field]?.length > 180) throw new ServiceError(`El campo ${field} es demasiado largo.`, 400);
-      if (!player.RUT?.trim() || !player.Nombres?.trim()) throw new ServiceError('El nombre y el RUT son obligatorios.', 400);
+      if (!player.RUT?.trim() || !player.Nombres?.trim()) throw new ServiceError('El nombre y el RUT o ID son obligatorios.', 400);
       for (const field of DOCUMENT_FIELDS) if (player[field] && !driveFileId(player[field])) throw new ServiceError('Los documentos deben estar guardados en Google Drive.', 400);
       const existing = body.action === 'UPDATE_REGISTRATION' ? await findPlayer(String(body.originalRut || '')) : undefined;
       if (existing && existing.RUT !== player.RUT) throw new ServiceError('No se puede cambiar el RUT de un registro existente.', 400);

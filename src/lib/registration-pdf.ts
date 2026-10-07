@@ -1,7 +1,7 @@
 import { PDFDocument, StandardFonts, rgb, type PDFPage, type PDFFont } from 'pdf-lib';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { fullName, isMinor, missingRequirements, type DocumentField, type Player } from './registration';
+import { fullName, identificationLabel, isMinor, missingRequirements, type DocumentField, type Player } from './registration';
 
 type Attachment = { bytes: Uint8Array; mimeType: string };
 export type AttachmentLoader = (field: DocumentField) => Promise<Attachment>;
@@ -82,7 +82,7 @@ export async function buildRegistrationPdf(player: Player, load: AttachmentLoade
   page.drawRectangle({ x: 397, y: page.getHeight() - 359, width: 100, height: 105, borderWidth: 0.6, borderColor: rgb(0.1, 0.1, 0.1), color: rgb(1, 1, 1) });
   await picture(page, 'Foto_Jugador', 399, 256, 96, 101);
   originalField('FECHA DE NACIMIENTO', date(player.Fecha_Nacimiento), 60, 180, 369, 110);
-  originalField('RUT', player.RUT, 340, 371, 369, 144);
+  originalField(identificationLabel(player), player.RUT, 340, 371, 369, 144);
   originalSection('DATOS DE LA INSCRIPCIÓN', 411);
   originalField('FECHA DE INSCRIPCIÓN', date(player.Fecha_Inscripcion || player.Fecha_Registro), 60, 180, 434, 110);
   originalField('CLUB', 'VALLE GRANDE FC', 310, 342, 434, 173);

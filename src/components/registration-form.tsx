@@ -5,7 +5,7 @@ import { CheckCircle2, Loader2 } from 'lucide-react';
 import { SignaturePad } from './signature-pad';
 import { PhotoCrop } from './photo-crop';
 import { apiPost, prepareImage, readDataUrl, rotateImage, uploadDataUrl, validateFile } from '@/lib/client-files';
-import { AUTHORIZATION_VERSION, automaticStatus, guardianAuthorization, isMinor, localDate, missingRequirements, playerAuthorization, REGISTRATION_TYPES, type DocumentField, type Player } from '@/lib/registration';
+import { AUTHORIZATION_VERSION, identificationLabel, isForeignPlayer, playerAuthorizationMatches, guardianAuthorizationMatches, automaticStatus, guardianAuthorization, isMinor, localDate, missingRequirements, playerAuthorization, REGISTRATION_TYPES, type DocumentField, type Player } from '@/lib/registration';
 
 const SERIES = ['1ERA INFANTIL', '2DA INFANTIL', '3RA INFANTIL', '4TA INFANTIL', 'JUVENIL', '3RA ADULTA', '2DA ADULTA', '1ERA ADULTA', 'SENIOR', 'SUPER SENIOR', 'DORADOS', 'FEMENINA INFANTIL', 'FEMENINA ADULTA'];
 const empty: Player = { RUT: '', Nombres: '', Apellido_Paterno: '', Apellido_Materno: '', Fecha_Nacimiento: '', Nacionalidad: 'CHILENA', Serie: '', WhatsApp: '', Direccion: '', Posicion: '', Nombre_Apoderado: '', RUT_Apoderado: '' };
@@ -31,8 +31,8 @@ export function RegistrationForm({ initial, onSaved, admin = false }: { initial?
   const minor = isMinor(data);
   const authorization = playerAuthorization(data);
   const guardianText = guardianAuthorization(data);
-  const existingSignature = !!data.Firma_Jugador && data.Autorizacion_Texto === authorization;
-  const existingGuardianSignature = !!data.Firma_Apoderado && data.Autorizacion_Apoderado_Texto === guardianText;
+  const existingSignature = !!data.Firma_Jugador && playerAuthorizationMatches(data);
+  const existingGuardianSignature = !!data.Firma_Apoderado && guardianAuthorizationMatches(data);
   useEffect(() => {
     let active = true;
     fetch('/api/players?capabilities=1').then(r => r.json()).then(value => { if (active) setCapable(value.registrationVersion === 1); }).catch(() => { if (active) setCapable(false); });
@@ -40,7 +40,7 @@ export function RegistrationForm({ initial, onSaved, admin = false }: { initial?
   }, []);
   function change(field: string, value: string) {
     setData(prev => ({ ...prev, [field]: value }));
-    if (['Nombres', 'Apellido_Paterno', 'Apellido_Materno', 'RUT', 'Fecha_Nacimiento'].includes(field)) { setSignature(''); setConsent(false); setGuardianSignature(''); setGuardianConsent(false); }
+    if (['Nombres', 'Apellido_Paterno', 'Apellido_Materno', 'RUT', 'Fecha_Nacimiento', 'Nacionalidad'].includes(field)) { setSignature(''); setConsent(false); setGuardianSignature(''); setGuardianConsent(false); }
     if (['Nombre_Apoderado', 'RUT_Apoderado'].includes(field)) { setGuardianSignature(''); setGuardianConsent(false); }
   }
   async function selectFile(field: DocumentField, file?: File) {
@@ -107,7 +107,7 @@ export function RegistrationForm({ initial, onSaved, admin = false }: { initial?
     } else if (!existingGuardianSignature) prepared.Firma_Apoderado = '';
     const missing = missingRequirements(prepared);
     if (!admin && missing.length) { setError(`Falta completar: ${missing.join(', ')}.`); return; }
-    if (!prepared.Nombres.trim() || !prepared.RUT.trim()) { setError('Completa al menos el nombre y el RUT.'); return; }
+    if (!prepared.Nombres.trim() || !prepared.RUT.trim()) { setError('Completa al menos el nombre y el RUT o ID.'); return; }
     setBusy(true);
     try {
       const pending: Partial<Record<DocumentField, string>> = { ...assets, ...(signature ? { Firma_Jugador: signature } : {}), ...(minor && guardianSignature ? { Firma_Apoderado: guardianSignature } : {}) };
@@ -118,7 +118,7 @@ export function RegistrationForm({ initial, onSaved, admin = false }: { initial?
         let url = uploadCache.current.get(source);
         if (!url) {
           const extension = source.startsWith('data:application/pdf') ? 'pdf' : source.startsWith('data:image/png') ? 'png' : 'jpg';
-          url = await uploadDataUrl(source, `${prepared.RUT.replace(/[^0-9kK]/g, '')}_${field}.${extension}`);
+          url = await uploadDataUrl(source, `${prepared.RUT.replace(/[^a-zA-Z0-9]/g, '')}_${field}.${extension}`);
           uploadCache.current.set(source, url);
         }
         prepared[field] = url;
@@ -147,11 +147,11 @@ export function RegistrationForm({ initial, onSaved, admin = false }: { initial?
     {capable === false && <p role="status" className="rounded-xl bg-amber-500/10 border border-amber-500/30 p-4 text-sm text-amber-200">Las nuevas inscripciones estarán disponibles cuando el club termine de conectar el sistema. Tus datos aún no se han enviado.</p>}
     <fieldset disabled={busy || processing} className="space-y-6 disabled:opacity-70">
       <section className="glass-card p-5 sm:p-7 space-y-5"><h2 className="font-bold text-lg">1. Datos del jugador</h2><div className="grid sm:grid-cols-2 gap-4">
-        {input('RUT', 'RUT del jugador', 'text', true)}{input('Nombres', 'Nombres', 'text', true)}{input('Apellido_Paterno', 'Apellido paterno', 'text', true)}{input('Apellido_Materno', 'Apellido materno', 'text', !admin)}{input('Fecha_Nacimiento', 'Fecha de nacimiento', 'date', !admin)}{input('Nacionalidad', 'Nacionalidad', 'text', !admin)}
+        {input('Nacionalidad', 'Nacionalidad', 'text', !admin)}{input('RUT', `${identificationLabel(data)} del jugador`, 'text', true)}{input('Nombres', 'Nombres', 'text', true)}{input('Apellido_Paterno', 'Apellido paterno', 'text', true)}{input('Apellido_Materno', 'Apellido materno', 'text', !admin)}{input('Fecha_Nacimiento', 'Fecha de nacimiento', 'date', !admin)}
         <label className="text-sm text-slate-300">Serie *<select aria-label="Serie" required={!admin} value={data.Serie} onChange={e => change('Serie', e.target.value)} className="input-field w-full mt-1"><option value="">Selecciona una serie</option>{SERIES.map(s => <option key={s}>{s}</option>)}</select></label>
         {input('WhatsApp', 'WhatsApp', 'tel')}{input('Direccion', 'Dirección')}
         {admin && <label className="text-sm text-slate-300">Tipo de inscripción<select aria-label="Tipo de inscripción" value={data.Tipo_Inscripcion || ''} onChange={e => change('Tipo_Inscripcion', e.target.value)} className="input-field w-full mt-1"><option value="">Seleccionar trámite</option>{REGISTRATION_TYPES.map(t => <option key={t}>{t}</option>)}</select></label>}
-      </div></section>
+      </div><p className="text-xs text-slate-400">{isForeignPlayer(data) ? 'Identificación extranjera: ingresa tu ID o pasaporte con letras y números (hasta 40 caracteres).' : 'Identificación chilena: ingresa tu RUT con dígito verificador.'}</p></section>
       <section className="glass-card p-5 sm:p-7 space-y-5"><h2 className="font-bold text-lg">2. Documentos y foto</h2><div className="grid sm:grid-cols-2 gap-4">{fileInput('Foto_Cedula_Frontal')}{fileInput('Foto_Cedula_Reverso')}{!minor && fileInput('Antecedentes_PDF')}</div>
         {cropSource ? <PhotoCrop key={cropSource} source={cropSource} onConfirm={value => setAssets(prev => ({ ...prev, Foto_Jugador: value }))} disabled={busy || processing} /> : data.Foto_Cedula_Frontal && <button type="button" onClick={() => void cropExisting()} className="btn-primary">{data.Foto_Jugador ? 'Ajustar foto desde la cédula' : 'Recortar foto desde la cédula guardada'}</button>}
         {!data.Foto_Cedula_Frontal && !assets.Foto_Cedula_Frontal && <p className="text-sm text-slate-400">Al adjuntar la cédula frontal podrás recortar la foto para la ficha.</p>}
